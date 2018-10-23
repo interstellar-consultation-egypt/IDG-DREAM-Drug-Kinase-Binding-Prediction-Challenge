@@ -1,8 +1,18 @@
-# # install necessary packages (if not installed already)
-# install.packages('tidyverse')
-# install.packages('webchem')
-# source("https://bioconductor.org/biocLite.R")
-# biocLite("Rcpi")
+# install necessary packages (if not installed already)
+load.libraries <- c("tidyverse", "webchem", "Rcpi")
+install.lib <- load.libraries[!load.libraries %in% installed.packages()]
+for(libs in install.lib) {
+  if (libs %in% c("Biobase", "Rcpi")) {
+    source("https://bioconductor.org/biocLite.R")
+    biocLite("Rcpi")
+  } else {
+    install.packages(libs, dependences = TRUE)
+  }
+}
+  
+sapply(load.libraries, require, character = TRUE)
+
+
 
 
 # load necessary packages
