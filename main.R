@@ -18,35 +18,37 @@ dtc_data <- fread(file = "data/DTC_data.csv",
                   select = c("compound_id", "target_id", "standard_type",
                              "standard_relation", "standard_value"),
                   showProgress = TRUE)
-
-
-# keep only specific columns
-dtc_data <- dtc_data %>%
-  select(compound_id, # compound
-         target_id, # target
-         standard_type,  # measurement type
-         standard_relation,  # '=', '>', '<', etc.
-         standard_value)       # the value
+fwrite(dtc_data, file = "data/DTC_data_selected.csv")
 
 
 # make sure we have no NA values in specific variables
-dtc_data <- dtc_data %>% filter(!is.na(compound_id) & !is.na(target_id) & !is.na(standard_value) & !is.na(standard_type))
+dtc_data <- dtc_data %>%
+  filter(
+    !is.na(compound_id) &
+      !is.na(target_id) &
+      !is.na(standard_value) &
+      !is.na(standard_type)
+  )
 
 
 # we are only interested in PKD measurements (i.e. the target variable)
-dtc_data <- dtc_data %>% filter(standard_type == 'PKD') %>% select(-standard_type)
+dtc_data <- dtc_data %>% 
+  filter(standard_type == 'PKD') %>% 
+  select(-standard_type)
 
 
 # rename some variables
 #dtc_data <- dtc_data %>% rename(inchi_key = standard_inchi_key, pkd = standard_value)
-dtc_data <- dtc_data %>% rename(pkd = standard_value)
+dtc_data <- dtc_data %>%
+  rename(pkd = standard_value)
 
 
 # deal with standard_relation: '<', '>'
-dtc_data <- dtc_data %>% filter(standard_relation == '=') %>% select(-standard_relation)
-# dtc_data <- dtc_data %>% mutate(standard_value = ifelse(standard_relation == '<', standard_value - 0.5, standard_value))
-# dtc_data <- dtc_data %>% mutate(standard_value = ifelse(standard_relation == '>', standard_value + 0.5, standard_value))
+dtc_data <- dtc_data %>%
+  filter(standard_relation == '=') %>% 
+  select(-standard_relation)
 
+fwrite(dtc_data, file = "data/DTC_data_final.csv")
 
 # unique compound ids
 compound_IDs <- dtc_data %>% select(compound_id) %>% unique()
