@@ -1,5 +1,5 @@
 # install necessary packages (if not installed already)
-load.libraries <- c("tidyverse", "webchem", "Rcpi")
+load.libraries <- c("tidyverse", "data.table", "webchem", "Rcpi")
 install.lib <- load.libraries[!load.libraries %in% installed.packages()]
 for(libs in install.lib) {
   if (libs %in% c("Biobase", "Rcpi")) {
@@ -13,25 +13,20 @@ for(libs in install.lib) {
 sapply(load.libraries, require, character = TRUE)
 
 
-
-
-# load necessary packages
-library(tidyverse)
-#library(webchem)
-library(Rcpi)
-
-
 # read the data
-dtc_data <- read_csv('DTC_data.csv')
+dtc_data <- fread(file = "data/DTC_data.csv",
+                  select = c("compound_id", "target_id", "standard_type",
+                             "standard_relation", "standard_value"),
+                  showProgress = TRUE)
 
 
 # keep only specific columns
-dtc_data <- dtc_data %>% select(compound_id,          # compound
-                                #standard_inchi_key,   # compound structure
-                                target_id,            # target
-                                standard_type,        # measurement type
-                                standard_relation,    # '=', '>', '<', etc.
-                                standard_value)       # the value
+dtc_data <- dtc_data %>%
+  select(compound_id, # compound
+         target_id, # target
+         standard_type,  # measurement type
+         standard_relation,  # '=', '>', '<', etc.
+         standard_value)       # the value
 
 
 # make sure we have no NA values in specific variables
