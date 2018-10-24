@@ -1,10 +1,10 @@
 # install necessary packages (if not installed already)
-load.libraries <- c("tidyverse", "data.table", "webchem", "Rcpi")
+load.libraries <- c("tidyverse", "data.table", "webchem", "Rcpi", "ChemmineOB")
 install.lib <- load.libraries[!load.libraries %in% installed.packages()]
 for(libs in install.lib) {
   if (libs %in% c("Biobase", "Rcpi")) {
     source("https://bioconductor.org/biocLite.R")
-    biocLite("Rcpi")
+    biocLite("Rcpi", dependencies = c("Imports", "Enhances"))
   } else {
     install.packages(libs, dependences = TRUE)
   }
@@ -108,6 +108,19 @@ get_compounds <- function(compound_id) {
 }
 
 walk(compound_IDs, ~get_compounds(.x))
+
+draw_smiles <- function(compound_id) {
+  if ("" != compound_id) {
+    mol_id <- paste("data/MOL/", compound_id, ".mol", sep = "")
+    if (file.exists(mol_id)) {
+      smile_id <-
+        paste("data/SMILES/", compound_id, ".smiles", sep = "")
+      convMolFormat(mol_id, smile_id, "mol", "smiles")
+    }
+  }
+}
+
+walk(compound_IDs, ~draw_smiles(.x))
 
 #
 # B] For targets:
