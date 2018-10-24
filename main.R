@@ -48,25 +48,35 @@ dtc_data <- dtc_data %>%
   filter(standard_relation == '=') %>% 
   select(-standard_relation)
 
-fwrite(dtc_data, file = "data/DTC_data_final.csv")
+
 
 # unique compound ids
-compound_IDs <- dtc_data %>% select(compound_id) %>% unique()
+compound_IDs <- dtc_data %>% 
+  select(compound_id) %>% 
+  unique()
 compound_IDs <- compound_IDs$compound_id
-target_IDs <- dtc_data %>% select(target_id) %>% unique()
+target_IDs <- dtc_data %>%
+  select(target_id) %>% 
+  unique()
 target_IDs <- target_IDs$target_id
 
 
 # dealing with records containing multiple targets in target_id
-target_IDs <- c(target_IDs, 'Q9JHJ5', 'P23979', 'Q15303', 'P21860', 'P04626', 'P00533', 'P28223', 'P28335', 'P41595')
+target_IDs <- c(target_IDs, 'Q9JHJ5', 'P23979', 'Q15303', 'P21860',
+                'P04626', 'P00533', 'P28223', 'P28335', 'P41595')
 target_IDs <- target_IDs[!grepl(',',target_IDs)]    # remove multi-target records
 target_IDs <- unique(target_IDs)
+
+fwrite(dtc_data, file = "data/DTC_data_final.csv")
+
 # TO DO:
 # there are three problematic records in dtc_data that have these values
 # - "Q9JHJ5, P23979"                    -->  split to two records   (pkd value is the same for these records)
 # - "Q15303, P21860, P04626, P00533"    -->  split to four records  (pkd value is the same for these records)
 # - "P28223, P28335, P41595"            -->  split to three records (pkd value is the same for these records)
 
+dtc_data <- dtc_data %>% 
+  separate_rows(target_id, sep=",\\s+")
 
 # get features!
 
