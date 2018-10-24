@@ -92,7 +92,23 @@ dtc_data <- dtc_data %>%
 #   3. Rcpi::extractDrugAIO(readMolFromSmi(filename, 'mol'), warn = FALSE)    # to get features for compound
 #   4. Add to file, 'compoundFeatures.txt', where each row represents a unique compound
 #   5. Features post-processing: remove constant-valued features & scale to range [0,1] using min-max normalization, etc.
-#
+
+
+get_compounds <- function(compound_id) {
+  if ("" != compound_id){
+    mol <- getMolFromChEMBL(compound_id)
+    if ("" != mol) {
+      mol_id <- paste("data/MOL/", compound_id, ".mol", sep = "")
+      sink(mol_id)
+      cat(mol)
+      sink()
+    }
+  }
+  
+}
+
+walk(compound_IDs, ~get_compounds(.x))
+
 #
 # B] For targets:
 #   1. go to: https://www.uniprot.org/uploadlists/
