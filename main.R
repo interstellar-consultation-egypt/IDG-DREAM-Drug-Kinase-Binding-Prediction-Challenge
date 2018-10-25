@@ -1,5 +1,5 @@
 # install necessary packages (if not installed already)
-load.libraries <- c("tidyverse", "data.table", "webchem", "Rcpi", "ChemmineOB")
+load.libraries <- c("tidyverse", "data.table", "webchem", "Rcpi", "ChemmineOB", "BBmisc")
 install.lib <- load.libraries[!load.libraries %in% installed.packages()]
 for(libs in install.lib) {
   if (libs %in% c("Biobase", "Rcpi")) {
@@ -132,8 +132,16 @@ extract_features <- function(compound_id) {
 }
 
 mol_features <- map_df(compound_IDs, ~extract_features(.x))
+
 # Features post-processing: remove constant-valued features 
 mol_features <- mol_features[sapply(mol_features, function(x) length(unique(na.omit(x)))) > 1]
+fwrite(mol_features, "data/compoundFeatures.csv", quote = FALSE, row.names = FALSE)
+
+# Features post-processing:  scale to range [0,1] using min-max normalization, etc.
+mol_features_normalized <- normalize(mol_features, method = "range")
+fwrite(mol_features_normalized, "data/compoundFeaturesNormalized.csv",
+       quote = FALSE, row.names = FALSE)
+
 #
 # B] For targets:
 #   1. go to: https://www.uniprot.org/uploadlists/
