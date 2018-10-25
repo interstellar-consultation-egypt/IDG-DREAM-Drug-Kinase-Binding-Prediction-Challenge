@@ -83,17 +83,6 @@ dtc_data <- dtc_data %>%
 # steps:
 # A] For each compound in compound_IDs:
 #   1. Rcpi::getMolFromChEMBL('<compound_id>')    # to get 'Mol' string
-#   2. Write 'Mol' string to file: MOL/<compound_id>.mol
-#   3. Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smiles')
-#           Alternative: Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smi')
-#           # convert MOL format to SMILES format
-#           Alternative to steps all previous steps: use webchem package to generate SMILES from InChiKeys found in dtc_data
-#                webchem::cs_inchi_smiles() function  -->  then write SMILES into file 'SMILES/<compound_id>.smiles'
-#   3. Rcpi::extractDrugAIO(readMolFromSmi(filename, 'mol'), warn = FALSE)    # to get features for compound
-#   4. Add to file, 'compoundFeatures.txt', where each row represents a unique compound
-#   5. Features post-processing: remove constant-valued features & scale to range [0,1] using min-max normalization, etc.
-
-
 get_compounds <- function(compound_id) {
   if ("" != compound_id){
     mol <- getMolFromChEMBL(compound_id)
@@ -109,6 +98,12 @@ get_compounds <- function(compound_id) {
 
 walk(compound_IDs, ~get_compounds(.x))
 
+#   2. Write 'Mol' string to file: MOL/<compound_id>.mol
+#   3. Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smiles')
+#           Alternative: Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smi')
+#           # convert MOL format to SMILES format
+#           Alternative to steps all previous steps: use webchem package to generate SMILES from InChiKeys found in dtc_data
+#                webchem::cs_inchi_smiles() function  -->  then write SMILES into file 'SMILES/<compound_id>.smiles'
 draw_smiles <- function(compound_id) {
   if ("" != compound_id) {
     mol_id <- paste("data/MOL/", compound_id, ".mol", sep = "")
@@ -122,6 +117,23 @@ draw_smiles <- function(compound_id) {
 
 walk(compound_IDs, ~draw_smiles(.x))
 
+#   3. Rcpi::extractDrugAIO(readMolFromSmi(filename, 'mol'), warn = FALSE)    # to get features for compound
+#   4. Add to file, 'compoundFeatures.txt', where each row represents a unique compound
+#   5. Features post-processing: remove constant-valued features & scale to range [0,1] using min-max normalization, etc.
+
+extract_features <- function(compound_id) {
+  if ("" != compound_id) {
+    smile_id <-
+      paste("data/SMILES/", compound_id, ".smiles", sep = "")
+    if (file.exists(smile_id)) {
+      return(extractDrugAIO(readMolFromSmi(smile_id), warn = FALSE))
+    }
+  }
+}
+
+mol_features <- map_df(compound_IDs, ~extract_features(.x))
+# Features post-processing: remove constant-valued features 
+mol_features <- mol_features[sapply(mol_features, function(x) length(unique(na.omit(x)))) > 1]
 #
 # B] For targets:
 #   1. go to: https://www.uniprot.org/uploadlists/
