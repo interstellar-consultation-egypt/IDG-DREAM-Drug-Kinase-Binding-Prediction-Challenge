@@ -1,5 +1,6 @@
 # install necessary packages (if not installed already)
-load.libraries <- c("tidyverse", "data.table", "webchem", "Rcpi", "ChemmineOB", "BBmisc")
+load.libraries <- c("tidyverse", "data.table", "webchem", 
+                    "Rcpi", "ChemmineOB", "BBmisc", "seqinr")
 install.lib <- load.libraries[!load.libraries %in% installed.packages()]
 for(libs in install.lib) {
   if (libs %in% c("Biobase", "Rcpi")) {
@@ -148,7 +149,16 @@ fwrite(mol_features_normalized, "data/compoundFeaturesNormalized.csv",
 #   2. Provide protein identifiers (i.e. target_IDs) to text box in link, and click 'Submit' (default settings)
 #   3. Click 'Download' with format "FASTA (canonical)"
 #   4. Figure out a way to convert FASTA format to RAW protein sequence (get an R package that does this?)
+target_sequences <- read.fasta("data/targets.fasta", seqtype = "AA")
+sequences <- getSequence(target_sequences, as.string = TRUE)
 #   5. Put all protein sequences (one in each row) in a file called 'targetSequences.txt'
+write_sequence <- function(sequence) {
+  sink("data/targetSequences.txt", append = TRUE)
+  cat(sequence[[1]])
+  cat("\n")
+  sink()
+}
+walk(sequences, ~write_sequence(.x))
 #   6. Submit 'targetSequences.txt' to http://137.132.97.65/cgi-bin/profeat2016/protein/profnew.cgi
 #   7. You will probably need my help at this point  -->  call me!
 #
