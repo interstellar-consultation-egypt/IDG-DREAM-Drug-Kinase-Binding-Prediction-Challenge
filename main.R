@@ -180,7 +180,7 @@ walk(sequences, ~write_sequence(.x))
 #          (default settings)
 #   7. Load 'targetFeatures.txt' and fix target IDs
 #          take string after 1st '|' separator 
-
+target_features <- fread("data/targetFeatures.out", sep = ",")
 
 # ------------------------
 # C] merge all the training data into a single data frame
@@ -198,5 +198,4 @@ walk(sequences, ~write_sequence(.x))
 
 
 # You may consider exploring the functions that Rcpi has for generating descriptors (the ones starting with the prefix, 'extract')
-
 
