@@ -169,13 +169,13 @@ fwrite(mol_features_normalized, "data/compoundFeaturesNormalized.csv",
 target_sequences <- read.fasta("data/targets.fasta", seqtype = "AA")
 sequences <- getSequence(target_sequences, as.string = TRUE)
 #   5. Put all protein sequences (one in each row) in a file called 'targetSequences.txt'
-write_sequence <- function(sequence) {
-  sink("data/targetSequences.txt", append = TRUE)
+write_sequence <- function(sequence, file_name) {
+  sink(file_name, append = TRUE)
   cat(sequence[[1]])
   cat("\n")
   sink()
 }
-walk(sequences, ~write_sequence(.x))
+walk(sequences, ~write_sequence(.x, "data/targetSequences.txt"))
 #   6. Submit 'targetSequences.txt' to http://137.132.97.65/cgi-bin/profeat2016/protein/profnew.cgi
 #          (default settings)
 #   7. Load 'targetFeatures.txt' and fix target IDs
@@ -225,9 +225,13 @@ fwrite(test_features, "data/testFeatures.csv", quote = FALSE, row.names = FALSE)
 test_features_normalized <- normalize(test_features, method = "range")
 fwrite(test_features_normalized, "data/testFeatures_normalized.csv", quote = FALSE, row.names = FALSE)
 
-#get test target features
+# get test target features
 test_targets <- fread("data/round_1_template.csv", select = "UniProt_Id")
 fwrite(test_targets, "data/test_targets.out", row.names = FALSE, col.names = FALSE, quote = FALSE)
 
+test_target_sequences <- read.fasta("data/test.fasta", seqtype = "AA")
+sequences <- getSequence(target_sequences, as.string = TRUE)
+# Put all protein sequences (one in each row) in a file called 'testTargetSequences.txt'
+walk(sequences, ~write_sequence(.x, "data/testTargetSequences.txt"))
 # You may consider exploring the functions that Rcpi has for generating descriptors (the ones starting with the prefix, 'extract')
 
