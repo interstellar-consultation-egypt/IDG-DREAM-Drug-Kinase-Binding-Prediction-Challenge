@@ -230,8 +230,15 @@ test_targets <- fread("data/round_1_template.csv", select = "UniProt_Id")
 fwrite(test_targets, "data/test_targets.out", row.names = FALSE, col.names = FALSE, quote = FALSE)
 
 test_target_sequences <- read.fasta("data/test.fasta", seqtype = "AA")
-sequences <- getSequence(target_sequences, as.string = TRUE)
+sequences <- getSequence(test_target_sequences, as.string = TRUE)
 # Put all protein sequences (one in each row) in a file called 'testTargetSequences.txt'
 walk(sequences, ~write_sequence(.x, "data/testTargetSequences.txt"))
+
+#  Load 'testTargetFeatures.txt' and fix target IDs
+#          take string after 1st '|' separator 
+target_features <- fread("data/testTargetFeatures.out", sep = ",")
+target_features$Feature <- substr(target_features$Feature, start = 4, stop = 9)
+fwrite(target_features, "data/testTargetFeatures.out", row.names = FALSE, quote = FALSE)
+
 # You may consider exploring the functions that Rcpi has for generating descriptors (the ones starting with the prefix, 'extract')
 
