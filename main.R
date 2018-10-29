@@ -204,9 +204,21 @@ full_dataset <- inner_join(compounds_full, target_features)
 fwrite(full_dataset, "data/train.csv")
 
 # ------------------------
-# Repeat the above for the test set (which is referred to as "Round 1 Submission Template" on the competition website). 
+# Repeat the above for the test set (which is referred to as "Round 1 Submission Template" on
+# the competition website). 
 # Check this link for the test set:  https://www.synapse.org/#!Synapse:syn15667962/wiki/583675
-
+# read the test smiles
+test_smiles <- fread("data/round_1_template.csv", select = "Compound_SMILES")
+# write it into smiles format
+fwrite(test_smiles, file = "data/test_smiles.smiles", row.names = FALSE, quote = FALSE)
+# extract features
+test_features <- extractDrugAIO(molecules = readMolFromSmi("data/test_smiles.smiles", 'mol'), warn = FALSE)
+# Features post-processing: remove constant-valued features 
+test_features <- test_features[sapply(test_features, function(x) length(unique(na.omit(x)))) > 1]
+fwrite(test_features, "data/testFeatures.csv", quote = FALSE, row.names = FALSE)
+# Features post-processing:  scale to range [0,1] using min-max normalization, etc.
+test_features_normalized <- normalize(test_features, method = "range")
+fwrite(test_features_normalized, "data/testFeatures_normalized.csv", quote = FALSE, row.names = FALSE)
 
 # You may consider exploring the functions that Rcpi has for generating descriptors (the ones starting with the prefix, 'extract')
 
