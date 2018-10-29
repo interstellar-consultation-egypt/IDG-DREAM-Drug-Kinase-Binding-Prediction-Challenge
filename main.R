@@ -189,11 +189,19 @@ fwrite(target_features, "data/targetFeatures.out", row.names = FALSE, quote = FA
 # C] merge all the training data into a single data frame
 #   1. have the following data frames ready
 #       a) compound_id, target_id, pkd
+dtc <- fread("data/DTC_data_final.csv")
 #       b) compound_id, followed by the compound features
+compound_features <- fread("data/compoundFeatures.csv")
+compound_features <- cbind(compound_IDs, compound_features)
+compound_features <- rename(compound_features,  compound_id = compound_IDs)
+compounds_full <- inner_join(dtc, compound_features)
 #       c) target_id, followed by the target features
 #   2. INNER JOIN: a+b
 #   3. INNER JOIN: (a+b) + c
-
+target_features <- fread("data/targetFeatures.out")
+target_features <- rename(target_features, target_id = Feature)
+full_dataset <- inner_join(compounds_full, target_features)
+fwrite(full_dataset, "data/train.csv")
 
 # ------------------------
 # Repeat the above for the test set (which is referred to as "Round 1 Submission Template" on the competition website). 
