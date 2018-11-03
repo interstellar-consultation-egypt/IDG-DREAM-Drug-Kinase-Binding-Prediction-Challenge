@@ -110,6 +110,25 @@ fwrite(dtc_data, file = "data/train/DTC_data_final.csv")
 ##-----------------------------------------------------------------------
 
 
+# A] For each compound in compound_IDs:
+#   1. Rcpi::getMolFromChEMBL('<compound_id>')    # to get 'Mol' string
+#   2. Write 'Mol' string to file: MOL/<compound_id>.mol
+#   3. Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smiles')
+#           Alternative: Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smi')
+#           # convert MOL format to SMILES format
+#           Alternative to all previous steps: use webchem package to generate SMILES from InChiKeys found in dtc_data
+#                webchem::cs_inchi_smiles() function  -->  then write SMILES into file 'SMILES/<compound_id>.smiles'
+#   3. Rcpi::extractDrugAIO(readMolFromSmi(filename, 'mol'), warn = FALSE)    # to get features for compound
+#   4. Add to file, 'compoundFeatures.txt', where each row represents a unique compound
+#   5. Features post-processing: remove constant-valued features & scale to range [0,1] using min-max normalization
+
+
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
 ## generate compound structure files!    [TRAINING DATA]
 
 
@@ -125,19 +144,8 @@ dtc <- read_csv("data/train/DTC_data_final.csv")
 compound_IDs <- unique(dtc$compound_id)
 target_IDs <- unique(dtc$target_id)
 
-# steps:
-# A] For each compound in compound_IDs:
-#   1. Rcpi::getMolFromChEMBL('<compound_id>')    # to get 'Mol' string
-#   2. Write 'Mol' string to file: MOL/<compound_id>.mol
-#   3. Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smiles')
-#           Alternative: Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smi')
-#           # convert MOL format to SMILES format
-#           Alternative to all previous steps: use webchem package to generate SMILES from InChiKeys found in dtc_data
-#                webchem::cs_inchi_smiles() function  -->  then write SMILES into file 'SMILES/<compound_id>.smiles'
-#   3. Rcpi::extractDrugAIO(readMolFromSmi(filename, 'mol'), warn = FALSE)    # to get features for compound
-#   4. Add to file, 'compoundFeatures.txt', where each row represents a unique compound
-#   5. Features post-processing: remove constant-valued features & scale to range [0,1] using min-max normalization
 
+## get compound MOL files
 get_compounds <- function(compound_id) {
   if ("" != compound_id){
     mol <- getMolFromChEMBL(compound_id)
@@ -152,6 +160,7 @@ get_compounds <- function(compound_id) {
 walk(compound_IDs, ~get_compounds(.x))
 
 
+## get compound SMILES files
 draw_smiles <- function(compound_id) {
   if ("" != compound_id) {
     mol_id <- paste("data/train/MOL/", compound_id, ".mol", sep = "")
@@ -213,27 +222,30 @@ extract_features <- function(compound_id) {
 mol_features <- map_df(compound_IDs, ~extract_features(.x))
 
 
-## Features post-processing: remove constant-valued features 
-mol_features <- mol_features[sapply(mol_features, function(x) length(unique(na.omit(x)))) > 1]
+## Features post-processing: remove constant-valued features + write to file
+mol_features <- 
+    mol_features[sapply(mol_features, function(x) length(unique(na.omit(x))))>1]
 fwrite(cbind(compound_IDs, mol_features), 
        "data/train/compoundFeatures.csv", 
        quote = FALSE, 
        row.names = FALSE)
 
 
-## fill NA's with column mean (if any)
-replaceWithMean <- function(x) {
-    x <- replace_na(x, mean(x, na.rm = TRUE))
-}
-mol_features_normalized <- map_df(mol_features, replaceWithMean)
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
 
-
-## Features post-processing: scale to range [0,1] using min-max normalization
-mol_features_normalized <- normalize(mol_features_normalized, method = "range")
-fwrite(cbind(compound_IDs, mol_features_normalized), 
-       "data/train/compoundFeaturesNormalized.csv",
-       quote = FALSE, 
-       row.names = FALSE)
+# B] For targets:
+#   1. go to: https://www.uniprot.org/uploadlists/
+#   2. Provide protein identifiers (i.e. target_IDs) to text box in link, and click 'Submit' (default settings)
+#   3. Click 'Download' with format "FASTA (canonical)"
+#   4. Figure out a way to convert FASTA format to RAW protein sequence (get an R package that does this?)
+#   5. Put all protein sequences (one in each row) in a file called 'targetSequences.txt'
+#   6. Submit 'targetSequences.txt' to http://137.132.97.65/cgi-bin/profeat2016/protein/profnew.cgi
+#          (default settings)
+#   7. Load 'targetFeatures.txt' and fix target IDs
+#          take string after 1st '|' separator 
 
 
 ##-----------------------------------------------------------------------
@@ -265,20 +277,6 @@ fwrite(cbind(compound_IDs, mol_features_normalized),
 ##-----------------------------------------------------------------------
 
 
-# ------------------------
-# B] For targets:
-#   1. go to: https://www.uniprot.org/uploadlists/
-#   2. Provide protein identifiers (i.e. target_IDs) to text box in link, and click 'Submit' (default settings)
-#   3. Click 'Download' with format "FASTA (canonical)"
-#   4. Figure out a way to convert FASTA format to RAW protein sequence (get an R package that does this?)
-#   5. Put all protein sequences (one in each row) in a file called 'targetSequences.txt'
-#   6. Submit 'targetSequences.txt' to http://137.132.97.65/cgi-bin/profeat2016/protein/profnew.cgi
-#          (default settings)
-#   7. Load 'targetFeatures.txt' and fix target IDs
-#          take string after 1st '|' separator 
-# ------------------------
-
-
 ## get target sequences file!    [TRAINING DATA]
 
 
@@ -295,11 +293,10 @@ compound_IDs <- unique(dtc$compound_id)
 target_IDs <- unique(dtc$target_id)
 
 
+## simplify protein IDs in FASTA file before submitting to PROFEAT
 target_sequences <- read.fasta("data/train/targets.fasta", seqtype = "AA")
 sequences <- getSequence(target_sequences, as.string = TRUE)
 sequences <- paste(target_IDs, as.vector(unlist(sequences)), sep = ",")
-
-
 write_sequence <- function(sequence, file_name) {
   sink(file_name, append = TRUE)
   splitParts <- strsplit(sequence, ',')
@@ -318,14 +315,6 @@ walk(sequences, ~write_sequence(.x, "data/train/targets_modifiedIDs.fasta"))
 #     strsplit(names(target_sequences), split = '|', fixed = TRUE) %>%
 #     sapply(function(x){ return(x[2]) })
 # all(target_IDs == fastaTargetIDs)
-# ------------------------------
-
-# ------------------------------
-## Fallen code:
-# walk(sequences, ~write_sequence(.x, "data/train/targetSequences.txt"))
-# target_features <- read_csv("data/train/targetFeatures.out", sep = ",")
-# target_features$Feature <- substr(target_features$Feature, start = 4, stop = 9)
-# fwrite(target_features, "data/train/targetFeatures.out", row.names = FALSE, quote = FALSE)
 # ------------------------------
 
 
@@ -369,7 +358,7 @@ compound_IDs <- unique(dtc$compound_id)
 target_IDs <- unique(dtc$target_id)
 
 
-## normalize?
+## Features post-processing: remove constant-valued features + write to file
 target_features <- read_csv("data/train/targetFeatures.out")
 target_features <- rename(target_features, target_id = Feature)
 ## ---------------------
@@ -377,94 +366,31 @@ target_features <- rename(target_features, target_id = Feature)
 # all(target_IDs == target_features$target_id)
 ## ---------------------
 target_features <- target_features %>% select(-target_id)
-
-
-## Features post-processing: remove constant-valued features 
-target_features <- target_features[sapply(target_features, function(x) length(unique(na.omit(x)))) > 1]
+target_features <- 
+    target_features[sapply(target_features, function(x) length(unique(na.omit(x))))>1]
 fwrite(cbind(target_IDs, target_features), 
        "data/train/targetFeatures.csv", 
        quote = FALSE, 
        row.names = FALSE)
 
 
-## fill NA's with column mean (if any)
-replaceWithMean <- function(x) {
-    x <- replace_na(x, mean(x, na.rm = TRUE))
-}
-target_features_normalized <- map_df(target_features, replaceWithMean)
-
-
-## Features post-processing: percentage-style variables to be divided by 100
-## These are the variables starting with '[G1', '[G2' and '[G4'
-target_features_normalized[,1:419]    <- 
-    target_features_normalized[,1:419]    / 100
-target_features_normalized[,690:1188] <- 
-    target_features_normalized[,690:1188] / 100
-
-
-## Features post-processing: scale to range [0,1] using min-max normalization
-remainingFeatures <- 1:ncol(target_features_normalized)
-remainingFeatures <- setdiff(remainingFeatures, c(1:419, 690:1188))
-target_features_normalized[,remainingFeatures] <- 
-    normalize(target_features_normalized[,remainingFeatures], method = "range")
-fwrite(cbind(target_IDs, target_features_normalized), 
-       "data/train/targetFeaturesNormalized.csv",
-       quote = FALSE, 
-       row.names = FALSE)
-
-
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------
 
 
-## Form proper dataset    [TRAINING DATA]
+## repeat above steps for test data    [TEST DATA]
+
+## ------------------------
+## Repeat the above for the test set (which is referred to as "Round 1 
+## Submission Template" on the competition website). 
+## Check this link for the test set:  https://www.synapse.org/#!Synapse:syn15667962/wiki/583675
+## ------------------------
 
 
 ## clear environment
 rm(list = ls())
-
-
-# ------------------------
-# C] merge all the training data into a single data frame
-#   1. have the following data frames ready
-#       a) compound_id, target_id, pkd
-#       b) compound_id, followed by the compound features
-#       c) target_id, followed by the target features
-#   2. INNER JOIN: a+b
-#   3. INNER JOIN: (a+b) + c
-# ------------------------
-
-dtc <- read_csv("data/train/DTC_data_final.csv")
-compound_features <- read_csv("data/train/compoundFeatures.csv")
-compound_features <- rename(compound_features,  compound_id = compound_IDs)
-target_features <- read_csv("data/train/targetFeatures.csv")
-target_features <- rename(target_features, target_id = target_IDs)
-full_dataset <- 
-    dtc %>% 
-    inner_join(compound_features, by = 'compound_id') %>% 
-    inner_join(target_features, by = 'target_id')
-fwrite(full_dataset, "data/train/train.csv")
-
-
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-
-
-## Form proper dataset    [TEST DATA]
-
-
-## clear environment
-rm(list = ls())
-
-# ------------------------
-# Repeat the above for the test set (which is referred to as "Round 1 Submission Template" on
-# the competition website). 
-# Check this link for the test set:  https://www.synapse.org/#!Synapse:syn15667962/wiki/583675
-# ------------------------
 
 
 ## read the test smiles
@@ -495,23 +421,11 @@ compound_features_test <-
 ## keep only features that appear in the training set as well
 compound_features_train <- read_csv("data/train/compoundFeatures.csv")
 compound_features_test <- compound_features_test[,colnames(compound_features_train)[2:166]]
-
-
-## Features post-processing: remove constant-valued features 
-# compound_features_test <- compound_features_test[sapply(compound_features_test, function(x) length(unique(na.omit(x)))) > 1]
 fwrite(compound_features_test, 
        "data/test/compoundFeatures.csv", 
        quote = FALSE, 
        row.names = FALSE)
 ## NOTE: compound features are saved WITHOUT their compound IDs
-
-
-# Features post-processing: scale to range [0,1] using min-max normalization
-compound_features_test_normalized <- normalize(compound_features_test, method = "range")
-fwrite(compound_features_test_normalized, 
-       "data/test/compoundFeaturesNormalized.csv", 
-       quote = FALSE, 
-       row.names = FALSE)
 
 
 # get test target features
@@ -601,10 +515,6 @@ target_features_test <- target_features_test %>% select(-target_id)
 ## keep only features that appear in the training set as well
 target_features_train <- read_csv("data/train/targetFeatures.csv")
 target_features_test <- target_features_test[,colnames(target_features_train)[2:1432]]
-
-
-## Features post-processing: remove constant-valued features 
-# target_features <- target_features[sapply(target_features, function(x) length(unique(na.omit(x)))) > 1]
 fwrite(target_features_test, 
        "data/test/targetFeatures.csv", 
        quote = FALSE, 
@@ -612,30 +522,71 @@ fwrite(target_features_test,
 ## NOTE: target features are saved WITHOUT their target IDs
 
 
-## fill NA's with column mean (if any)
-replaceWithMean <- function(x) {
-    x <- replace_na(x, mean(x, na.rm = TRUE))
-}
-target_features_test_normalized <- map_df(target_features_test, replaceWithMean)
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
 
 
-## Features post-processing: percentage-style variables to be divided by 100
-## These are the variables starting with '[G1', '[G2' and '[G4'
-target_features_test_normalized[,1:419]    <- 
-    target_features_test_normalized[,1:419]    / 100
-target_features_test_normalized[,690:1188] <- 
-    target_features_test_normalized[,690:1188] / 100
+## fill NAs in compound/target features + normalization
+source('normalizer.R')
 
 
-# Features post-processing: scale to range [0,1] using min-max normalization
-remainingFeatures <- 1:ncol(target_features_test_normalized)
-remainingFeatures <- setdiff(remainingFeatures, c(1:419, 690:1188))
-target_features_test_normalized[,remainingFeatures] <- 
-    normalize(target_features_test_normalized[,remainingFeatures], method = "range")
-fwrite(target_features_test_normalized, 
-       "data/test/targetFeaturesNormalized.csv",
-       quote = FALSE, 
-       row.names = FALSE)
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## Form proper dataset    [TRAINING DATA]
+
+# ------------------------
+# C] merge all the training data into a single data frame
+#   1. have the following data frames ready
+#       a) compound_id, target_id, pkd
+#       b) compound_id, followed by the compound features
+#       c) target_id, followed by the target features
+#   2. INNER JOIN: a+b
+#   3. INNER JOIN: (a+b) + c
+# ------------------------
+
+
+## clear environment
+rm(list = ls())
+
+
+## generate training set for training prediction models
+dtc <- read_csv("data/train/DTC_data_final.csv")
+compound_features <- read_csv("data/train/compoundFeaturesNormalized.csv")
+compound_features <- rename(compound_features,  compound_id = compound_IDs)
+target_features <- read_csv("data/train/targetFeaturesNormalized.csv")
+target_features <- rename(target_features, target_id = target_IDs)
+full_dataset <- 
+    dtc %>% 
+    inner_join(compound_features, by = 'compound_id') %>% 
+    inner_join(target_features, by = 'target_id')
+fwrite(full_dataset, "data/train/train.csv")
+
+
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## Form proper dataset    [TEST DATA]
+
+
+## clear environment
+rm(list = ls())
+
+
+## generate test set
+compound_features <- read_csv("data/test/compoundFeaturesNormalized.csv")
+target_features <- read_csv("data/test/targetFeaturesNormalized.csv")
+full_dataset <- cbind(compound_features %>% select(-compound_IDs),
+                      target_features %>% select(-target_IDs))
+fwrite(full_dataset, "data/test/test.csv")
 
 
 ##-----------------------------------------------------------------------
@@ -646,12 +597,14 @@ fwrite(target_features_test_normalized,
 
 ##
 ## Afterthought:
-## 1. Rcpi has functions for generating descriptors for proteins (the ones starting with the prefix, 'extract')
-## 2. Normalization should be performed on the training and testing together!
-## 3. functions of the data.table package (e.g. 'fread')  coerce the data into 
+## 1. Rcpi has functions for generating descriptors for proteins (the ones 
+##    starting with the prefix, 'extract'). Maybe worth checking out?
+## 2. Normalization should be performed on the training and test sets together!
+## 3. NA imputation should be performed on the training and test sets together!
+## 4. functions of the data.table package (e.g. 'fread')  coerce the data into 
 ##    data structures that require knowledge of non-standard syntax for 
-##    indexing and retrieving data from within 
-## 4. PROFEAT web server seems to prefer FASTA files to files containing raw
+##    indexing and retrieving data from within. Better to avoid if possible.
+## 5. PROFEAT web server seems to prefer FASTA files to files containing raw
 ##    protein sequences
 ## 
 
