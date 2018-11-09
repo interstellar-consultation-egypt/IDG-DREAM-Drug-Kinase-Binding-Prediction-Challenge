@@ -39,3 +39,8 @@ submission %>%
     cbind(predictions) %>% 
     write_csv('data/round_1_submission_1.csv')
 
+
+## RESULTS
+## RMSE     PEARSON     SPEARMAN    CI          F1          AVG_AUC
+## 1.1816	0.2012	    0.1898	    0.5566	    0.1194	    0.579
+
