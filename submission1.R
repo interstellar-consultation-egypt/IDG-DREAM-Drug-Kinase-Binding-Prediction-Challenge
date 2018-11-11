@@ -6,9 +6,10 @@ source('ml.R')
 
 
 ## load data
-train_dta <- read_csv('data/train/train.csv')
-test_dta  <- read_csv('data/test/test.csv')
-submission <- read_csv('data/round_1_template.csv')
+path <- 'data/dataset1/'
+train_dta  <- read_csv(paste(path, 'train/train.csv', sep = ''))
+test_dta   <- read_csv(paste(path, 'test/test.csv', sep = ''))
+submission <- read_csv(paste(path, 'round_1_template.csv', sep = ''))
 numCompoundFeatures <- 165
 
 
