@@ -1,42 +1,47 @@
 #===============================================================================
 
 ## Assumptions
-## 'trainingSet' and 'testSet' have the same number of columns
+## 'train' and 'test' have the same number of columns
 ## The columns consist of compound features followed by target features
 
 #===============================================================================
 
 
-rls_avg <- function(trainingSet,
-                    trainingSetLabels,
-                    testSet,
+rls_avg <- function(train,
+                    trainLabels,
+                    test,
                     compFeatIndx,
                     targFeatIndx,
                     predFunParams = list(lambda = 0.125),
                     dimReduction = 'none') {
+
+    ## separate into compound and target features
+    trainCompoundFeatures <- train[,compFeatIndx]
+    trainTargetFeatures   <- train[,targFeatIndx]
+    testCompoundFeatures <- test[,compFeatIndx]
+    testTargetFeatures   <- test[,targFeatIndx]
+    
+    ## DIMENSIONALITY REDUCTION
+    if (dimReduction != 'none') {
+        trainCompoundFeatures <- dim_red(trainCompoundFeatures, dimReduction)
+        trainTargetFeatures   <- dim_red(trainTargetFeatures,   dimReduction)
+        testCompoundFeatures  <- dim_red(testCompoundFeatures,  dimReduction)
+        testTargetFeatures    <- dim_red(testTargetFeatures,    dimReduction)
+    }
     
     ## PARAMETER VALUES
     lambda <- predFunParams$lambda
     
-    ## DIMENSIONALITY REDUCTION
-    if (dimReduction != 'none') {
-        dim_red(trainingSet,
-                testSet,
-                compFeatIndx,
-                targFeatIndx,
-                dimReduction)
-    }
-    
     ## KERNELS
-    Kc_train <- rbf_kernel(as.matrix(trainingSet[,compFeatIndx]))
-    Kt_train <- rbf_kernel(as.matrix(trainingSet[,targFeatIndx]))
-    Kc_test  <- rbf_kernel(as.matrix(testSet[,compFeatIndx]),
-                           as.matrix(trainingSet[,compFeatIndx]))
-    Kt_test  <- rbf_kernel(as.matrix(testSet[,targFeatIndx]),
-                           as.matrix(trainingSet[,targFeatIndx]))
+    Kc_train <- rbf_kernel(as.matrix(trainCompoundFeatures))
+    Kt_train <- rbf_kernel(as.matrix(trainTargetFeatures))
+    Kc_test  <- rbf_kernel(as.matrix(testCompoundFeatures),
+                           as.matrix(trainCompoundFeatures))
+    Kt_test  <- rbf_kernel(as.matrix(testTargetFeatures),
+                           as.matrix(trainTargetFeatures))
     
     ## PREDICTIONS
-          y <- trainingSetLabels
+          y <- trainLabels
     lambdaI <- lambda * diag(ncol(Kc_train))    ## lambda * identity matrix
      yhat_c <- Kc_test %*% (solve(Kc_train + lambdaI) %*% y)
      yhat_t <- Kt_test %*% (solve(Kt_train + lambdaI) %*% y)
@@ -50,38 +55,43 @@ rls_avg <- function(trainingSet,
 #===============================================================================
 
 
-rls_kron <- function(trainingSet,
-                     trainingSetLabels,
-                     testSet,
+rls_kron <- function(train,
+                     trainLabels,
+                     test,
                      compFeatIndx,
                      targFeatIndx,
                      predFunParams = list(lambda = 0.125),
                      dimReduction = 'none') {
+
+    ## separate into compound and target features
+    trainCompoundFeatures <- train[,compFeatIndx]
+    trainTargetFeatures   <- train[,targFeatIndx]
+    testCompoundFeatures <- test[,compFeatIndx]
+    testTargetFeatures   <- test[,targFeatIndx]
+    
+    ## DIMENSIONALITY REDUCTION
+    if (dimReduction != 'none') {
+        trainCompoundFeatures <- dim_red(trainCompoundFeatures, dimReduction)
+        trainTargetFeatures   <- dim_red(trainTargetFeatures,   dimReduction)
+        testCompoundFeatures  <- dim_red(testCompoundFeatures,  dimReduction)
+        testTargetFeatures    <- dim_red(testTargetFeatures,    dimReduction)
+    }
     
     ## PARAMETER VALUES
     lambda <- predFunParams$lambda
     
-    ## DIMENSIONALITY REDUCTION
-    if (dimReduction != 'none') {
-        dim_red(trainingSet,
-                testSet,
-                compFeatIndx,
-                targFeatIndx,
-                dimReduction)
-    }
-    
     ## KERNELS
-    Kc_train <- rbf_kernel(as.matrix(trainingSet[,compFeatIndx]))
-    Kt_train <- rbf_kernel(as.matrix(trainingSet[,targFeatIndx]))
-    Kc_test  <- rbf_kernel(as.matrix(testSet[,compFeatIndx]),
-                           as.matrix(trainingSet[,compFeatIndx]))
-    Kt_test  <- rbf_kernel(as.matrix(testSet[,targFeatIndx]),
-                           as.matrix(trainingSet[,targFeatIndx]))
+    Kc_train <- rbf_kernel(as.matrix(trainCompoundFeatures))
+    Kt_train <- rbf_kernel(as.matrix(trainTargetFeatures))
+    Kc_test  <- rbf_kernel(as.matrix(testCompoundFeatures),
+                           as.matrix(trainCompoundFeatures))
+    Kt_test  <- rbf_kernel(as.matrix(testTargetFeatures),
+                           as.matrix(trainTargetFeatures))
     Ktrain   <- Kc_train * Kt_train
     Ktest    <- Kc_test * Kt_test
     
     ## PREDICTIONS
-          y <- trainingSetLabels
+          y <- trainLabels
     lambdaI <- lambda * diag(ncol(Kc_train))    ## lambda * identity matrix
        yhat <- Ktest %*% (solve(Ktrain + lambdaI) %*% y)
     
@@ -93,9 +103,64 @@ rls_kron <- function(trainingSet,
 #===============================================================================
 
 
-ensembler <- function(trainingSet,
-                      trainingSetLabels,
-                      testSet,
+rls_kron_graphreg <- function(train,
+                              trainLabels,
+                              test,
+                              compFeatIndx,
+                              targFeatIndx,
+                              predFunParams = list(lambda = 0.125, p = 5),
+                              dimReduction = 'none') {
+
+    ## separate into compound and target features
+    trainCompoundFeatures <- train[,compFeatIndx]
+    trainTargetFeatures   <- train[,targFeatIndx]
+    testCompoundFeatures <- test[,compFeatIndx]
+    testTargetFeatures   <- test[,targFeatIndx]
+    
+    ## DIMENSIONALITY REDUCTION
+    if (dimReduction != 'none') {
+        trainCompoundFeatures <- dim_red(trainCompoundFeatures, dimReduction)
+        trainTargetFeatures   <- dim_red(trainTargetFeatures,   dimReduction)
+        testCompoundFeatures  <- dim_red(testCompoundFeatures,  dimReduction)
+        testTargetFeatures    <- dim_red(testTargetFeatures,    dimReduction)
+    }
+    
+    ## PARAMETER VALUES
+    lambda <- predFunParams$lambda
+    p <- predFunParams$p
+    
+    ## KERNELS
+    Kc_train <- rbf_kernel(as.matrix(trainCompoundFeatures))
+    Kt_train <- rbf_kernel(as.matrix(trainTargetFeatures))
+    Kc_test  <- rbf_kernel(as.matrix(testCompoundFeatures),
+                           as.matrix(trainCompoundFeatures))
+    Kt_test  <- rbf_kernel(as.matrix(testTargetFeatures),
+                           as.matrix(trainTargetFeatures))
+    Ktrain   <- Kc_train * Kt_train
+    Ktest    <- Kc_test * Kt_test
+    
+    ## SPARSIFICATION (keep top 5 values in each row)
+    if (p > 0) {
+        Ktrain <- sparsifier(Ktrain, p)
+        Ktest <- sparsifier(Ktest, p)
+    }
+    
+    ## PREDICTIONS
+          y <- trainLabels
+    lambdaI <- lambda * diag(ncol(Kc_train))    ## lambda * identity matrix
+       yhat <- Ktest %*% (solve(Ktrain + lambdaI) %*% y)
+    
+    ## return predicted labels
+    yhat
+}
+
+
+#===============================================================================
+
+
+ensembler <- function(train,
+                      trainLabels,
+                      test,
                       compFeatIndx,
                       targFeatIndx,
                       predFunParams = list(numLearners = 20,
@@ -115,15 +180,15 @@ ensembler <- function(trainingSet,
     ## ENSEMBLE TIME!
     yhat <- 0
     for (i in 1:numLearners) {
-        trainingSet_i <- trainingSet
-        trainingSetLabels_i <- trainingSetLabels
-        testSet_i <- testSet
+        train_i <- train
+        trainLabels_i <- trainLabels
+        test_i <- test
         
         ## BAGGING
         if (bag) {
-            baggedInstances <- sample(nrow(trainingSet), replace = T)
-            trainingSet_i <- trainingSet[baggedInstances,]
-            trainingSetLabels_i <- trainingSetLabels[baggedInstances]
+            baggedInstances <- sample(nrow(train), replace = T)
+            train_i <- train[baggedInstances,]
+            trainLabels_i <- trainLabels[baggedInstances]
         }
         
         ## FEATURE SUBSPACING
@@ -145,16 +210,16 @@ ensembler <- function(trainingSet,
                 c(compoundFeatures, (targetFeatures + numCompoundFeatures))
             
             ## MODIFIED TRAINING AND TEST SETS
-            trainingSet_i <- trainingSet_i[, selectedFeatures]
-            testSet_i <- testSet_i[, selectedFeatures]
+            train_i <- train_i[, selectedFeatures]
+            test_i <- test_i[, selectedFeatures]
         }
         
         ## PREDICTIONS
-        yhat <- yhat + baseLearner(trainingSet,
-                                   trainingSetLabels,
-                                   testSet,
+        yhat <- yhat + baseLearner(train,
+                                   trainLabels,
+                                   test,
                                    1:numCompoundFeatures,
-                                   (numCompoundFeatures+1):ncol(trainingSet),
+                                   (numCompoundFeatures+1):ncol(train),
                                    predFunParams,
                                    dimReduction)
     }
@@ -193,37 +258,78 @@ rbf_kernel <- function(X, Y, sigma) {
 #===============================================================================
 
 
-dim_red <- function(trainingSet,
-                    testSet,
-                    compFeatIndx,
-                    targFeatIndx,
-                    dimReduction) {
+dim_red <- function(dta, dimReduction) {
     
-    ## type this in the console and hit Enter:
-    ## dimRed::dimRedMethodList()
+    ## For inspiration, type this in the console and hit Enter:
+    ## 
+    ##      dimRed::dimRedMethodList()
     ##
-    ## The output is a list of dimensionality reduction that are available
+    ## The output is a list of dimensionality reduction techniques to consider
+    
+    
+    ## DIMENSIONALITY REDUCTION
+    if (dimReduction == 'pca') {
+        dta <- prcomp(dta, retx = T, center = T)$x[,1:10]
+        
+    } else if (dimReduction == 'kpca') {
+        ##...
+        
+    } else if (dimReduction == 'isomap') {
+        ##...
+        
+    } else if (dimReduction == 'lapeig') {
+        ##...
+        
+    } else if (dimReduction == 'mds') {
+        ##...
+        
+    } else if (dimReduction == 'mds') {
+        ##...
+        
+    }
+    
+    
+    ## return dimensionality-reduced data
+    dta
 }
 
 
 #===============================================================================
 
 
-# check_missing <- function(trainingSet, 
-#                           trainingSetLabels,
-#                           testSet, 
+sparsifier <- function(mtrx, p) {
+    ## sparsify
+    for (i in 1:nrow(mtrx)) {
+        row_i <- mtrx[i,]
+        sorted <- sort(row_i, decreasing = T, index.return = T)
+        toBeKeptIndices <- sorted$ix[1:p]
+        toBeZeroedIndices <- setdiff(1:ncol(mtrx), toBeKeptIndices)
+        mtrx[i,toBeZeroedIndices] <- 0
+    }
+    
+    ## return sparsified similarity matrix
+    mtrx
+}
+
+
+#===============================================================================
+
+
+# check_missing <- function(train, 
+#                           trainLabels,
+#                           test, 
 #                           numCompoundFeat) {
 #  
 #     ## if any important arguments missing...   
-#     if (missing(trainingSet) || 
-#         missing(trainingSetLabels) || 
-#         missing(testSet) || 
+#     if (missing(train) || 
+#         missing(trainLabels) || 
+#         missing(test) || 
 #         missing(numCompoundFeat))
 #         ## STOP!!!
 #         stop('function \'ml.R::rls()\' did not receive argument(s): ',
-#              if (missing(trainingSet)) '\'trainingSet\' ' else '',
-#              if (missing(trainingSetLabels)) '\'trainingSetLabels\' ' else '',
-#              if (missing(testSet)) '\'testSet\' ' else '',
+#              if (missing(train)) '\'train\' ' else '',
+#              if (missing(trainLabels)) '\'trainLabels\' ' else '',
+#              if (missing(test)) '\'test\' ' else '',
 #              if (missing(numCompoundFeat)) '\'numCompoundFeat\' ' else '')
 # }
 

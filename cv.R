@@ -42,10 +42,16 @@ evaluate <- function(predictions, labels, evalMetrics) {
         if (evalMetric == 'f1score')     ## F1 score
             evalResults[i] <- Metrics::f1((labels > 7) %>% as.numeric(), 
                                           (predictions > 7) %>% as.numeric())
+        
+        if (evalMetric == 'ci')          ## concordance index
+            evalResults[i] <- 0
+        
+        if (evalMetric == 'avg_auc')     ## average AUC
+            evalResults[i] <- 0
     
         
         ##########
-        ### TO DO: remaining metrics  -->  Concordance index (CI), average AUC
+        ### TO DO: fix eval. metrics: Concordance index (CI), average AUC
         ##########
         
     }
@@ -73,7 +79,6 @@ get_folds <- function(allData, cvSetting, k) {
         len <- nrow(allData)           ## len <- numInstances
     }
   
-    set.seed(12345)            ## for reproducibility
     rand_ind <- sample(len)    ## randomize order
   
     ## number of folds (i.e. 'k') cannot be greater than 'len'
@@ -135,9 +140,12 @@ kfoldcv <- function(allData,
                     k = 5, 
                     poolingCV = T,
                     evalMetrics = c('rmse'),
-                    predFun,
+                    predFun = match.fun('rls_kron'),
                     predFunParams = list(),
                     dimReduction = 'none') {
+    
+    ## for reproducibility
+    set.seed(12345)
     
     ## the k-fold experiment --------------------
     folds <- get_folds(allData, cvSetting, k)    ## get the k folds
@@ -212,7 +220,8 @@ kfoldcv <- function(allData,
     
         ## Get evaluation results for each fold...
         for (i in 1:k) {
-            evalResults[i,] <- evaluate(predictions, 
+            labels <- folds[[i]][,3] %>% as.matrix()
+            evalResults[i,] <- evaluate(predictions[[i]], 
                                         labels, 
                                         evalMetrics)
         }
@@ -233,7 +242,7 @@ loocv <- function(allData,
                   cvSetting = 'S1', 
                   poolingCV = T,
                   evalMetrics = c('rmse'),
-                  predFun,
+                  predFun = match.fun('rls_kron'),
                   predFunParams = list(),
                   dimReduction = 'none') {
     
