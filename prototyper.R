@@ -53,7 +53,10 @@ for (loo in loos) {
             
             cat('\n====================================================\n\n')
             cat('CV Setting:\t',    cvSetting,  '\n')
-            cat('Leave One Out:\t', looString,  '\n')
+            cat('Leave One Out:\t', looString)
+            if (!loo)
+                cat('\t[k=', k, ']', sep = '')
+            cat('\n')
             cat('Pooling CV:\t',    poolString, '\n')
             cat('Start Time:\t',    as.character(Sys.time()), '\n\n\n')
             
@@ -131,7 +134,10 @@ for (loo in loos) {
             
             cat('\n====================================================\n\n')
             cat('CV Setting:\t',    cvSetting,  '\n')
-            cat('Leave One Out:\t', looString,  '\n')
+            cat('Leave One Out:\t', looString)
+            if (!loo)
+                cat('\t[k=', k, ']', sep = '')
+            cat('\n')
             cat('Pooling CV:\t',    poolString, '\n')
             cat('Start Time:\t',    as.character(Sys.time()), '\n\n\n')
 
@@ -209,7 +215,10 @@ for (loo in loos) {
             
             cat('\n====================================================\n\n')
             cat('CV Setting:\t',    cvSetting,  '\n')
-            cat('Leave One Out:\t', looString,  '\n')
+            cat('Leave One Out:\t', looString)
+            if (!loo)
+                cat('\t[k=', k, ']', sep = '')
+            cat('\n')
             cat('Pooling CV:\t',    poolString, '\n')
             cat('Start Time:\t',    as.character(Sys.time()), '\n\n\n')
 
@@ -299,7 +308,10 @@ for (loo in loos) {
             
             cat('\n====================================================\n\n')
             cat('CV Setting:\t',    cvSetting,  '\n')
-            cat('Leave One Out:\t', looString,  '\n')
+            cat('Leave One Out:\t', looString)
+            if (!loo)
+                cat('\t[k=', k, ']', sep = '')
+            cat('\n')
             cat('Pooling CV:\t',    poolString, '\n')
             cat('Start Time:\t',    as.character(Sys.time()), '\n\n\n')
 
@@ -383,7 +395,10 @@ for (loo in loos) {
             
             cat('\n====================================================\n\n')
             cat('CV Setting:\t',    cvSetting,  '\n')
-            cat('Leave One Out:\t', looString,  '\n')
+            cat('Leave One Out:\t', looString)
+            if (!loo)
+                cat('\t[k=', k, ']', sep = '')
+            cat('\n')
             cat('Pooling CV:\t',    poolString, '\n')
             cat('Start Time:\t',    as.character(Sys.time()), '\n\n\n')
 
