@@ -96,10 +96,6 @@ dtc_data <-
     summarise(pkd = mean(pkd))
 
 dtc_data$pkd <- -log10(dtc_data$pkd * 10 ^ -9)
-## unique compound and target ids
-compound_IDs <- unique(dtc_data$compound_id)
-target_IDs <- unique(dtc_data$target_id)
-
 
 fwrite(dtc_data, file = paste(path, 'train/DTC_data_final.csv', sep = ''))
 
@@ -147,17 +143,17 @@ target_IDs <- unique(dtc$target_id)
 
 ## get compound MOL files
 get_compounds <- function(compound_id) {
-  if ('' != compound_id){
+  mol_id <- paste(path, 'train/MOL/', compound_id, '.mol', sep = '')
+  if ('' != compound_id & !file.exists(mol_id)) {
     mol <- getMolFromChEMBL(compound_id)
     if ('' != mol) {
-      mol_id <- paste(path, 'train/MOL/', compound_id, '.mol', sep = '')
       sink(mol_id)
       cat(mol)
       sink()
     }
   }
 }
-walk(compound_IDs, ~get_compounds(.x))
+walk(compound_IDs, ~ get_compounds(.x))
 
 
 ## get compound SMILES files
