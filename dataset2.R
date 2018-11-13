@@ -160,10 +160,11 @@ walk(compound_IDs, ~ get_compounds(.x))
 draw_smiles <- function(compound_id) {
   if ('' != compound_id) {
     mol_id <- paste(path, 'train/MOL/', compound_id, '.mol', sep = '')
-    if (file.exists(mol_id)) {
-      smile_id <-
-        paste(path, 'train/SMILES/', compound_id, '.smiles', sep = '')
+    smile_id <-
+      paste(path, 'train/SMILES/', compound_id, '.smiles', sep = '')
+    if (file.exists(mol_id) & !file.exists(smile_id)) {
       convMolFormat(mol_id, smile_id, 'mol', 'smiles')
+      Sys.sleep(time = 1)
     }
   }
 }
