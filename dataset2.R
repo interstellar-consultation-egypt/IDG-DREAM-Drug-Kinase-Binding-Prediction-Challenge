@@ -38,7 +38,7 @@ sapply(load.libraries, require, character = TRUE)
 dtc_data <- fread(file = 'data/DTC_data.csv',
                   select = c('compound_id', 'target_id', 'standard_type',
                              'standard_relation', 'standard_value',
-                             'standard_units'),
+                             'standard_inchi_key', 'standard_units'),
                   showProgress = TRUE,
                   na.strings = '')
 
@@ -73,7 +73,8 @@ dtc_data <-
       !is.na(standard_type) &
       toupper(standard_type) == 'KD' &
       toupper(standard_units) == 'NM' &
-      standard_relation == '='
+      standard_relation == '=' & 
+      !is.na(standard_inchi_key)
   ) %>%
   select(-standard_type, -standard_relation, -standard_units) %>% 
   rename(pkd = standard_value)
@@ -92,7 +93,7 @@ dtc_data <-
 ## different pkd values
 dtc_data <- 
     dtc_data %>% 
-    group_by(compound_id,target_id) %>% 
+    group_by(compound_id,target_id,standard_inchi_key) %>% 
     summarise(pkd = mean(pkd))
 
 dtc_data$pkd <- -log10(dtc_data$pkd * 10 ^ -9)
@@ -141,47 +142,62 @@ compound_IDs <- unique(dtc$compound_id)
 target_IDs <- unique(dtc$target_id)
 
 
-## get compound MOL files
-get_compounds <- function(compound_id) {
-  mol_id <- paste(path, 'train/MOL/', compound_id, '.mol', sep = '')
-  if ('' != compound_id & !file.exists(mol_id)) {
-    mol <- getMolFromChEMBL(compound_id)
-    if ('' != mol) {
-      sink(mol_id)
-      cat(mol)
-      sink()
-    }
-  }
+compound_IDs_plus_inchikeys <- 
+    dtc %>% 
+    select(compound_id,standard_inchi_key) %>% 
+    unique() %>% 
+    mutate(smiles = rep('', length(compound_id)))
+for (i in 1:nrow(compound_IDs_plus_inchikeys)) {
+    current_inchi_key <- compound_IDs_plus_inchikeys$standard_inchi_key[i]
+    compound_IDs_plus_inchikeys$smiles[i] <-
+        webchem::cs_inchikey_inchi(current_inchi_key) %>%
+        webchem::cs_inchi_smiles()
 }
-walk(compound_IDs, ~ get_compounds(.x))
 
 
-## get compound SMILES files
-draw_smiles <- function(compound_id) {
-  if ('' != compound_id) {
-    mol_id <- paste(path, 'train/MOL/', compound_id, '.mol', sep = '')
-    if (file.exists(mol_id)) {
-      smile_id <-
-        paste(path, 'train/SMILES/', compound_id, '.smiles', sep = '')
-      convMolFormat(mol_id, smile_id, 'mol', 'smiles')
-    }
-  }
-}
-walk(compound_IDs, ~draw_smiles(.x))
+## remove any compounds for which SMILES could not be generated
+compound_IDs_plus_inchikeys <- 
+    compound_IDs_plus_inchikeys %>% 
+    filter(!is.na(smiles)) %>% 
+    filter(smiles != '')
 
 
-# ------------------------------
-# Problem: compound ID 'CHEMBL1823872' has no downloadable MOL file
-# Solution: InchiKey from dtc_data, convert to InChi, then convert to SMILES
-CHEMBL1823872_SMILES <- 
-  webchem::cs_inchikey_inchi('NHXLMOGPVYXJNR-ATOGVRKGSA-N') %>% 
-  webchem::cs_inchi_smiles()
-CHEMBL1823872_SMILES_filename <- 
-  paste(path, 'train/SMILES/CHEMBL1823872.smiles', sep = '')
-fileConn<-file(CHEMBL1823872_SMILES_filename)
-writeLines(CHEMBL1823872_SMILES, fileConn)
-close(fileConn)
-# ------------------------------
+## remove any compounds with SMILES that are too short or too long
+compound_IDs_plus_inchikeys <- 
+    compound_IDs_plus_inchikeys %>% 
+    filter(map_dbl(smiles, nchar) > 20) %>% 
+    filter(map_dbl(smiles, nchar) < 125)
+
+
+## remove compounds having identical SMILES 
+## (if more than 1 compound have the same SMILES, remove them)
+identical_smiles <- 
+    compound_IDs_plus_inchikeys %>% 
+    group_by(smiles) %>% 
+    summarise(count = n()) %>% 
+    filter(count > 1)
+compound_IDs_plus_inchikeys <- 
+    compound_IDs_plus_inchikeys %>% 
+    filter(!(smiles %in% identical_smiles$smiles))
+
+
+## write final set of smiles to file
+allSmilesFilename <- paste(path, 'train/compoundSmiles.smiles', sep = '')
+write_lines(compound_IDs_plus_inchikeys$smiles, allSmilesFilename)
+# write_lines('compound_id,compound_smiles',
+#             path = allSmilesFilename)
+# write_lines(paste(compound_IDs_plus_inchikeys$compound_id, 
+#                   compound_IDs_plus_inchikeys$smiles,
+#                   sep =','),
+#             path = allSmilesFilename,
+#             append = T)
+
+
+## removed compounds (from above statement) to be also removed from dtc
+dtc <- 
+    dtc %>% 
+    filter(compound_id %in% compound_IDs_plus_inchikeys$compound_id)
+fwrite(dtc, file = paste(path, 'train/DTC_data_final.csv', sep = ''))
 
 
 ##-----------------------------------------------------------------------
@@ -197,31 +213,48 @@ close(fileConn)
 rm(list = setdiff(ls(), 'path'))
 
 
-## read the data
-dtc <- read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
-
-
-## stuff we'll need below
-compound_IDs <- unique(dtc$compound_id)
-target_IDs <- unique(dtc$target_id)
-
-
-extract_features <- function(compound_id) {
-  if ('' != compound_id) {
-    smile_id <-
-      paste(path, 'train/SMILES/', compound_id, '.smiles', sep = '')
-    if (file.exists(smile_id)) {
-      return(extractDrugAIO(readMolFromSmi(smile_id), warn = FALSE))
-    }
-  }
-}
-mol_features <- map_df(compound_IDs, ~extract_features(.x))
+## extract features
+compoundSmilesPath <- paste(path, 'train/compoundSmiles.smiles', sep = '')
+compound_features_train <-
+    extractDrugAIO(molecules = readMolFromSmi(compoundSmilesPath, 'mol'),
+                   warn = FALSE)
+# compoundSmiles <- readr::read_lines(compoundSmilesPath)
+# i <- 1
+# chunkSize <- 500
+# while (i <= length(compoundSmiles)) {
+#     ## start and end indices
+#     startIndx <- i
+#     endIndx <- min(i+chunkSize-1, length(compoundSmiles))
+# 
+#     ## create temporary file
+#     tmpPath <- paste(path, 'train/compoundSmiles.smiles', i, sep = '')
+#     write_lines(compoundSmiles[startIndx:endIndx], tmpPath)
+# 
+#     ## extract the features
+#     if (i == 1) {
+#         compound_features_train <-
+#             extractDrugAIO(molecules = readMolFromSmi(tmpPath, 'mol'),
+#                            warn = FALSE)
+#     } else {
+#         new_compound_features_train <-
+#             extractDrugAIO(molecules = readMolFromSmi(tmpPath, 'mol'),
+#                            warn = FALSE)
+#         compound_features_train <-
+#             rbind(compound_features_train, new_compound_features_train)
+#     }
+# 
+#     ## move indx to work on next chunk
+#     i <- i + chunkSize
+# 
+#     ## progress report
+#     cat('#Finished SMILES so far:', i-1, '\t', as.character(Sys.time()), '\n')
+# }
 
 
 ## Features post-processing: remove constant-valued features + write to file
-mol_features <- 
-    mol_features[sapply(mol_features, function(x) length(unique(na.omit(x))))>1]
-fwrite(cbind(compound_IDs, mol_features), 
+compound_features_train <- 
+    compound_features_train[sapply(compound_features_train, function(x) length(unique(na.omit(x))))>1]
+fwrite(cbind(compound_IDs, compound_features_train), 
        paste(path, 'train/compoundFeatures.csv', sep = ''), 
        quote = FALSE, 
        row.names = FALSE)
