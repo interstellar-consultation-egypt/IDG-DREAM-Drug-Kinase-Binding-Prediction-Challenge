@@ -317,6 +317,12 @@ for (loo in loos) {
 
             ## print header of evaluation results table
             cat('Current Method:\t', currentMethod, '\n')
+            cat('lambda\tnmLrnr\tbag\tr\tbsLrnr')
+            for (em in evalMetrics)
+                cat('\t', substr(em, start = 1, stop = 6))
+            cat('\n')
+
+            ## grid search over parameters: lambda
             results <- expand.grid(baseLearner = c('rls_kron'),
                                    bag = F,
                                    numLearners = 20,

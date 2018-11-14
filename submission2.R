@@ -28,7 +28,13 @@ predictions <- ensembler(train_dta,
                          trainingSetLabels,
                          test_dta,
                          compFeatIndx,
-                         targFeatIndx)
+                         targFeatIndx,
+                         predFunParams = list(numLearners = 20,
+                                              bag = F,
+                                              r = 0.7,
+                                              baseLearner = 'rls_kron_graphreg',
+                                              lambda = 2^-6,
+                                              p = 1))
 predictions <- 
     predictions %>% 
     as_data_frame() %>% 
@@ -38,10 +44,10 @@ predictions <-
 ## SUBMISSION FILE!
 submission %>% 
     cbind(predictions) %>% 
-    write_csv('data/round_1_submission_1.csv')
+    write_csv('data/round_1_submission_2.csv')
 
 
 ## RESULTS
 ## RMSE     PEARSON     SPEARMAN    CI          F1          AVG_AUC
-## 1.1816	0.2012	    0.1898	    0.5566	    0.1194	    0.579
+## 1.6785   -0.0396     -0.0544     0.5054      0.1978      0.4813
 
