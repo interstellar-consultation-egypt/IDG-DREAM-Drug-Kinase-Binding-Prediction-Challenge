@@ -285,8 +285,9 @@ dim_red <- function(dta, dimReduction) {
       dta <- emb@data@data
       
     } else if (dimReduction == 'mds') {
-        ##...
-        
+      mds <- MDS()
+      emb <- mds@fun(dat, mds@stdpars, ndim = 10)
+      
     } else if (dimReduction == 'mds') {
         ##...
         
