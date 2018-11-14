@@ -1,3 +1,4 @@
+library(dimRed)
 #===============================================================================
 
 ## Assumptions
@@ -272,7 +273,8 @@ dim_red <- function(dta, dimReduction) {
         dta <- prcomp(dta, retx = T, center = T)$x[,1:10]
         
     } else if (dimReduction == 'kpca') {
-        ##...
+        kpca(dta, kernel = "rbfdot",
+             kpar=list(sigma=0.2),features = 10 )
         
     } else if (dimReduction == 'isomap') {
         ##...
