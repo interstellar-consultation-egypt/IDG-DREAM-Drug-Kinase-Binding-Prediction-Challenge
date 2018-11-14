@@ -36,9 +36,7 @@ sapply(load.libraries, require, character = TRUE)
 
 ## read the data
 dtc_data <- fread(file = 'data/DTC_data.csv',
-                  select = c('compound_id', 'target_id', 'standard_type',
-                             'standard_relation', 'standard_value',
-                             'standard_units'),
+                  nrows = 1,
                   showProgress = TRUE,
                   na.strings = '')
 
@@ -164,7 +162,7 @@ draw_smiles <- function(compound_id) {
       paste(path, 'train/SMILES/', compound_id, '.smiles', sep = '')
     if (file.exists(mol_id) & !file.exists(smile_id)) {
       convMolFormat(mol_id, smile_id, 'mol', 'smiles')
-      Sys.sleep(time = 1)
+      Sys.sleep(5)
     }
   }
 }
