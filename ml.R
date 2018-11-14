@@ -277,7 +277,7 @@ dim_red <- function(dta, dimReduction) {
              kpar=list(sigma=0.2),features = 10 )
         
     } else if (dimReduction == 'isomap') {
-        ##...
+      embed(dat, "Isomap", mute = NULL, knn = 10)
         
     } else if (dimReduction == 'lapeig') {
         ##...
