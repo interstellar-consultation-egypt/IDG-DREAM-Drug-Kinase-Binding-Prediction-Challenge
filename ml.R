@@ -270,18 +270,20 @@ dim_red <- function(dta, dimReduction) {
     
     ## DIMENSIONALITY REDUCTION
     if (dimReduction == 'pca') {
-        dta <- prcomp(dta, retx = T, center = T)$x[,1:10]
+      dta <- prcomp(dta, retx = T, center = T)$x[,1:10]
         
     } else if (dimReduction == 'kpca') {
-        kpca(dta, kernel = "rbfdot",
+      dta <- kpca(dta, kernel = "rbfdot",
              kpar=list(sigma=0.2),features = 10 )
         
     } else if (dimReduction == 'isomap') {
-      embed(dat, "Isomap", mute = NULL, knn = 10)
+      dta <- embed(dat, "Isomap", mute = NULL, knn = 10)
         
     } else if (dimReduction == 'lapeig') {
-        ##...
-        
+      leim <- LaplacianEigenmaps()
+      emb <- leim@fun(dat, leim@stdpars, ndim = 10)
+      dta <- emb@data@data
+      
     } else if (dimReduction == 'mds') {
         ##...
         
