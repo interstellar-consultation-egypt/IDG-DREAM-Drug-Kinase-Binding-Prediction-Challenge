@@ -497,6 +497,15 @@ write_sequence <- function(sequence, file_name) {
 walk(sequences, ~write_sequence(.x, paste(path, 'test/targets_modifiedIDs.fasta', sep = '')))
 
 
+# ------------------------------
+## to check equivalence: target_IDs == IDs from fasta file?
+# fastaTargetIDs <-
+#     strsplit(names(target_sequences), split = '|', fixed = TRUE) %>%
+#     sapply(function(x){ return(x[2]) })
+# all(target_IDs == fastaTargetIDs)
+# ------------------------------
+
+
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------

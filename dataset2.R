@@ -11,16 +11,22 @@ path <- 'data/dataset2/'
 
 
 ## install necessary packages (if not installed already)
-load.libraries <- c('tidyverse', 'data.table', 'webchem', 
-                    'Rcpi', 'ChemmineOB', 'BBmisc', 'seqinr', 'rdetools')
+load.libraries <- c('tidyverse', 
+                    'data.table', 
+                    'webchem', 
+                    'Rcpi', 
+                    'ChemmineOB', 
+                    'BBmisc', 
+                    'seqinr', 
+                    'rdetools')
 install.lib <- load.libraries[!load.libraries %in% installed.packages()]
 for(libs in install.lib) {
-  if (libs %in% c('Biobase', 'Rcpi')) {
-    source('https://bioconductor.org/biocLite.R')
-    biocLite('Rcpi', dependencies = c('Imports', 'Enhances'))
-  } else {
-    install.packages(libs, dependences = TRUE)
-  }
+    if (libs %in% c('Biobase', 'Rcpi')) {
+        source('https://bioconductor.org/biocLite.R')
+        biocLite('Rcpi', dependencies = c('Imports', 'Enhances'))
+    } else {
+        install.packages(libs, dependences = TRUE)
+    }
 }
 sapply(load.libraries, require, character = TRUE)
 
@@ -107,26 +113,7 @@ fwrite(dtc_data, file = paste(path, 'train/DTC_data_final.csv', sep = ''))
 ##-----------------------------------------------------------------------
 
 
-# A] For each compound in compound_IDs:
-#   1. Rcpi::getMolFromChEMBL('<compound_id>')    # to get 'Mol' string
-#   2. Write 'Mol' string to file: MOL/<compound_id>.mol
-#   3. Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smiles')
-#           Alternative: Rcpi::convMolFormat('MOL/<compound_id>.mol', 'SMILES/<compound_id>.smiles', 'mol', 'smi')
-#           # convert MOL format to SMILES format
-#           Alternative to all previous steps: use webchem package to generate SMILES from InChiKeys found in dtc_data
-#                webchem::cs_inchi_smiles() function  -->  then write SMILES into file 'SMILES/<compound_id>.smiles'
-#   3. Rcpi::extractDrugAIO(readMolFromSmi(filename, 'mol'), warn = FALSE)    # to get features for compound
-#   4. Add to file, 'compoundFeatures.txt', where each row represents a unique compound
-#   5. Features post-processing: remove constant-valued features & scale to range [0,1] using min-max normalization
-
-
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-
-
-## generate compound structure files!    [TRAINING DATA]
+## Get compound SMILES!    [TRAINING DATA]
 
 
 ## clear environment
@@ -142,6 +129,7 @@ compound_IDs <- unique(dtc$compound_id)
 target_IDs <- unique(dtc$target_id)
 
 
+## get SMILES (this step takes 4+ hours!)
 compound_IDs_plus_inchikeys <- 
     dtc %>% 
     select(compound_id,standard_inchi_key) %>% 
@@ -182,15 +170,20 @@ compound_IDs_plus_inchikeys <-
 
 
 ## write final set of smiles to file
-allSmilesFilename <- paste(path, 'train/compoundSmiles.smiles', sep = '')
+allSmilesFilename <- paste(path, 'train/compoundSmiles.smi', sep = '')
 write_lines(compound_IDs_plus_inchikeys$smiles, allSmilesFilename)
-# write_lines('compound_id,compound_smiles',
-#             path = allSmilesFilename)
-# write_lines(paste(compound_IDs_plus_inchikeys$compound_id, 
-#                   compound_IDs_plus_inchikeys$smiles,
-#                   sep =','),
-#             path = allSmilesFilename,
-#             append = T)
+
+
+## for safekeeping
+allSmilesWithCompFilename <- 
+    paste(path, 'train/compoundSmilesWithCompIDs.csv', sep = '')
+write_lines('compound_id,compound_smiles',
+            path = allSmilesWithCompFilename)
+write_lines(paste(compound_IDs_plus_inchikeys$compound_id,
+                  compound_IDs_plus_inchikeys$smiles,
+                  sep =','),
+            path = allSmilesWithCompFilename,
+            append = T)
 
 
 ## removed compounds (from above statement) to be also removed from dtc
@@ -206,55 +199,104 @@ fwrite(dtc, file = paste(path, 'train/DTC_data_final.csv', sep = ''))
 ##-----------------------------------------------------------------------
 
 
-## get compound features!    [TRAINING DATA]
+## MANUAL STEP TO BE DONE BY HAND!
+
+## Generate compound features!    [TRAINING DATA]
+
+## Compound features are obtained via the python package: Mordred. It is 
+## available from the following link:
+##      https://github.com/mordred-descriptor/mordred
+## 
+## The command used to generate the features was:
+##      python -m mordred compoundSmiles.smi -o compoundFeaturesMordred.csv
+## 
+## To generate the features, the mordred package needed to be installed first, 
+## which was done as follows:
+##      Install Rdkit: conda install -c conda-forge rdkit
+##      Install MORDRED: conda install -c rdkit -c mordred-descriptor mordred
+##          if doesn't work: pip install mordred
+## 
+
+
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## Ensure consistency!    [TRAINING DATA]
 
 
 ## clear environment
 rm(list = setdiff(ls(), 'path'))
 
 
-## extract features
-compoundSmilesPath <- paste(path, 'train/compoundSmiles.smiles', sep = '')
-compound_features_train <-
-    extractDrugAIO(molecules = readMolFromSmi(compoundSmilesPath, 'mol'),
-                   warn = FALSE)
-# compoundSmiles <- readr::read_lines(compoundSmilesPath)
-# i <- 1
-# chunkSize <- 500
-# while (i <= length(compoundSmiles)) {
-#     ## start and end indices
-#     startIndx <- i
-#     endIndx <- min(i+chunkSize-1, length(compoundSmiles))
-# 
-#     ## create temporary file
-#     tmpPath <- paste(path, 'train/compoundSmiles.smiles', i, sep = '')
-#     write_lines(compoundSmiles[startIndx:endIndx], tmpPath)
-# 
-#     ## extract the features
-#     if (i == 1) {
-#         compound_features_train <-
-#             extractDrugAIO(molecules = readMolFromSmi(tmpPath, 'mol'),
-#                            warn = FALSE)
-#     } else {
-#         new_compound_features_train <-
-#             extractDrugAIO(molecules = readMolFromSmi(tmpPath, 'mol'),
-#                            warn = FALSE)
-#         compound_features_train <-
-#             rbind(compound_features_train, new_compound_features_train)
-#     }
-# 
-#     ## move indx to work on next chunk
-#     i <- i + chunkSize
-# 
-#     ## progress report
-#     cat('#Finished SMILES so far:', i-1, '\t', as.character(Sys.time()), '\n')
-# }
-
-
-## Features post-processing: remove constant-valued features + write to file
+## load data
+colTypesSpecs <- paste('c', paste(rep('d',1613), collapse=''), sep='')
 compound_features_train <- 
-    compound_features_train[sapply(compound_features_train, function(x) length(unique(na.omit(x))))>1]
-fwrite(cbind(compound_IDs, compound_features_train), 
+    read_csv(paste(path, 'train/compoundFeaturesMordred.csv', sep = ''), 
+             col_types = colTypesSpecs)
+compound_IDs_plus_smiles <- 
+    read_csv(paste(path, 'train/compoundSmilesWithCompIDs.csv', sep = ''))
+dtc <- 
+    read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
+
+
+## remove two variables: 'Lipinski', 'GhoseFilter'
+compound_features_train <- 
+    compound_features_train %>% 
+    select(-Lipinski, -GhoseFilter)
+
+
+## get compound (ChEMBL) IDs that exist in the compound features file
+compound_IDs_plus_smiles <- 
+    compound_IDs_plus_smiles %>% 
+    filter(compound_smiles %in% compound_features_train$name)
+
+
+## filter with compound IDs in 'dtc'
+dtc <- 
+    dtc %>% 
+    filter (compound_id %in% compound_IDs_plus_smiles$compound_id)
+
+
+## prepare compound feature file with finalized formatting
+## (there is still some post-processing to be done later)
+compound_features_train <- 
+    compound_features_train %>% 
+    rename(compound_smiles = name)
+compound_IDs_plus_smiles %>% 
+    inner_join(compound_features_train, by = 'compound_smiles') %>% 
+    select(-compound_smiles) %>% 
+    fwrite(file = paste(path, 'train/compoundFeatures.csv', sep = ''))
+
+
+## update 'DTC_data_final.csv'
+fwrite(dtc, file = paste(path, 'train/DTC_data_final.csv', sep = ''))
+
+
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## Features post-processing!    [TRAINING DATA]
+
+
+## clear environment
+rm(list = setdiff(ls(), 'path'))
+
+
+## remove constant-valued features + write to file
+colTypesSpecs <- paste('c', paste(rep('d',1611), collapse=''), sep='')
+compound_features_train <- 
+    read_csv(paste(path, 'train/compoundFeatures.csv', sep = ''), 
+             col_types = colTypesSpecs)
+compound_features_train <- 
+    compound_features_train[sapply(compound_features_train, 
+                                   function(x) length(unique(na.omit(x))))>1]
+fwrite(compound_features_train, 
        paste(path, 'train/compoundFeatures.csv', sep = ''), 
        quote = FALSE, 
        row.names = FALSE)
@@ -265,16 +307,21 @@ fwrite(cbind(compound_IDs, compound_features_train),
 ##-----------------------------------------------------------------------
 ##-----------------------------------------------------------------------
 
-# B] For targets:
-#   1. go to: https://www.uniprot.org/uploadlists/
-#   2. Provide protein identifiers (i.e. target_IDs) to text box in link, and click 'Submit' (default settings)
-#   3. Click 'Download' with format 'FASTA (canonical)'
-#   4. Figure out a way to convert FASTA format to RAW protein sequence (get an R package that does this?)
-#   5. Put all protein sequences (one in each row) in a file called 'targetSequences.txt'
-#   6. Submit 'targetSequences.txt' to http://137.132.97.65/cgi-bin/profeat2016/protein/profnew.cgi
-#          (default settings)
-#   7. Load 'targetFeatures.txt' and fix target IDs
-#          take string after 1st '|' separator 
+
+## Get Target IDs!    [TRAINING DATA]
+
+
+## clear environment
+rm(list = setdiff(ls(), 'path'))
+
+
+## load data
+dtc <- read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
+
+
+## will need this for next manual step!
+write_lines(dtc$target_id %>% unique() %>% as.vector(), 
+            path = paste(path, 'train/targetIDs.txt', sep = ''))
 
 
 ##-----------------------------------------------------------------------
@@ -285,19 +332,14 @@ fwrite(cbind(compound_IDs, compound_features_train),
 
 ## MANUAL STEP TO BE DONE BY HAND!
 
-## --------------------------
-## print target IDs on console
-# for (target_ID in target_IDs) {
-#     cat(target_ID, '\n')
-# }
-##
-## Copy output and paste in this link:
+## Get Target sequences!    [TRAINING DATA]
+
+## Copy target IDs from 'train/targetIDs.txt' and paste them in this link:
 ## https://www.uniprot.org/uploadlists/
 ##
 ## default settings --> submit --> 'Download' with format 'FASTA (canonical)'
-## --------------------------
 
-## output of this step is:  paste(path, 'train/targets.fasta', sep = '')
+## output of this step is:  'train/targets.fasta'
 
 
 ##-----------------------------------------------------------------------
@@ -313,19 +355,38 @@ fwrite(cbind(compound_IDs, compound_features_train),
 rm(list = setdiff(ls(), 'path'))
 
 
-## read the data
-dtc <- read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
-
-
 ## stuff we'll need below
-compound_IDs <- unique(dtc$compound_id)
-target_IDs <- unique(dtc$target_id)
+target_IDs <- read_lines(paste(path, 'train/targetIDs.txt', sep = ''))
+
+
+## parse sequences and their Uniprot IDs
+target_sequences <- read.fasta(paste(path, 'train/targets.fasta', sep = ''), seqtype = 'AA')
+sequences <- 
+    getSequence(target_sequences, as.string = TRUE) %>% 
+    unlist %>% 
+    as.vector
+getTargetId <- function(x) {
+    x <- strsplit(x, '|', fixed = TRUE)[[1]][2]
+    return(x)
+}
+seqHeaders <- 
+    getName(target_sequences) %>% 
+    sapply(getTargetId) %>% 
+    as.vector
+
+## consistency check
+sequences <- sequences[seqHeaders %in% target_IDs]
+seqHeaders <- seqHeaders[seqHeaders %in% target_IDs]
+
+
+## the amino acid X can cause problems in feature generation later
+Xsequences <- grepl('X', sequences)
+sequences <- sequences[!Xsequences]
+seqHeaders <- seqHeaders[!Xsequences]
+sequences <- paste(seqHeaders, sequences, sep = ',')
 
 
 ## simplify protein IDs in FASTA file before submitting to PROFEAT
-target_sequences <- read.fasta(paste(path, 'train/targets.fasta', sep = ''), seqtype = 'AA')
-sequences <- getSequence(target_sequences, as.string = TRUE)
-sequences <- paste(target_IDs, as.vector(unlist(sequences)), sep = ',')
 write_sequence <- function(sequence, file_name) {
   sink(file_name, append = TRUE)
   splitParts <- strsplit(sequence, ',')
@@ -335,35 +396,25 @@ write_sequence <- function(sequence, file_name) {
   # cat('\n')
   sink()
 }
-walk(sequences, ~write_sequence(.x, paste(path, 'train/targets_modifiedIDs.fasta', sep = '')))
+walk(sequences, 
+     ~write_sequence(.x, 
+                     paste(path, 'train/targets_modifiedIDs.fasta', sep = '')))
 
 
-# ------------------------------
-## to check equivalence: target_IDs == IDs from fasta file?
-# fastaTargetIDs <-
-#     strsplit(names(target_sequences), split = '|', fixed = TRUE) %>%
-#     sapply(function(x){ return(x[2]) })
-# all(target_IDs == fastaTargetIDs)
-# ------------------------------
+## save protein Uniprot IDs along with their sequences
+write_lines(sequences, 
+            paste(path, 'train/targets_IDs_sequences.csv', sep = ''))
 
 
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
+## filter with target IDs in 'DTC_data_final.csv'
+dtc <- read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
+dtc <- 
+    dtc %>% 
+    filter (target_id %in% seqHeaders)
 
 
-## MANUAL STEP TO BE DONE BY HAND!
-
-## --------------------------
-## submit the file, paste(path, 'train/targets_modifiedIDs.fasta', sep = ''), 
-## to the link below:
-## http://137.132.97.65/cgi-bin/profeat2016/protein/profnew.cgi
-## 
-## use default settings, output csv file and download
-## --------------------------
-
-## output of this step is:  paste(path, 'train/targetFeatures.out', sep = '')
+## update 'DTC_data_final.csv'
+fwrite(dtc, file = paste(path, 'train/DTC_data_final.csv', sep = ''))
 
 
 ##-----------------------------------------------------------------------
@@ -372,7 +423,7 @@ walk(sequences, ~write_sequence(.x, paste(path, 'train/targets_modifiedIDs.fasta
 ##-----------------------------------------------------------------------
 
 
-## get target features!    [TRAINING DATA]
+## Get target features!    [TRAINING DATA]
 
 
 ## clear environment
@@ -380,24 +431,42 @@ rm(list = setdiff(ls(), 'path'))
 
 
 ## read the data
-dtc <- read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
+seq_data <- read_csv(paste(path, 'train/targets_IDs_sequences.csv', sep = ''),
+                      col_names = F)
+sequences <- seq_data[,2] %>% unlist %>% as.vector
+target_IDs <- seq_data[,1] %>% unlist %>% as.vector
 
 
-## stuff we'll need below
-compound_IDs <- unique(dtc$compound_id)
-target_IDs <- unique(dtc$target_id)
+## generate features (this step takes less than an hour for 1260 proteins)
+first_time <- T
+for (s in sequences) {
+    ## get features of current sequence
+    sFeatures <- 
+        extractProtAAC(s) %>% 
+        append(extractProtDC(s)) %>% 
+        append(extractProtGeary(s)) %>% 
+        append(extractProtCTDC(s)) %>% 
+        append(extractProtCTDT(s)) %>% 
+        append(extractProtCTDD(s)) %>% 
+        append(extractProtQSO(s)) %>% 
+        append(extractProtAPAAC(s)) %>% 
+        append(extractProtSOCN(s)) %>% 
+        append(extractProtCTriad(s))
+    
+    if (first_time) {
+        target_features <- sFeatures
+        first_time <- F
+    } else {
+        target_features <- rbind(target_features, sFeatures)
+    }
+}
 
 
 ## Features post-processing: remove constant-valued features + write to file
-target_features <- read_csv(paste(path, 'train/targetFeatures.out', sep = ''))
-target_features <- rename(target_features, target_id = Feature)
-## ---------------------
-## Check equivalance of target IDs?
-# all(target_IDs == target_features$target_id)
-## ---------------------
-target_features <- target_features %>% select(-target_id)
+target_features <- as_data_frame(target_features)
 target_features <- 
-    target_features[sapply(target_features, function(x) length(unique(na.omit(x))))>1]
+    target_features[sapply(target_features, 
+                           function(x) length(unique(na.omit(x))))>1]
 fwrite(cbind(target_IDs, target_features), 
        paste(path, 'train/targetFeatures.csv', sep = ''),
        quote = FALSE,
@@ -410,14 +479,7 @@ fwrite(cbind(target_IDs, target_features),
 ##-----------------------------------------------------------------------
 
 
-## repeat above steps for test data    [TEST DATA]
-
-## ------------------------
-## Repeat the above for the test set (which is referred to as 'Round 1 
-## Submission Template' on the competition website). 
-## Check this link for the test set:  
-##   https://www.synapse.org/#!Synapse:syn15667962/wiki/583675
-## ------------------------
+## Get compound SMILES!    [TEST DATA]
 
 
 ## clear environment
@@ -429,29 +491,74 @@ compound_smiles <- read_csv('data/round_1_template.csv')
 compound_smiles <- compound_smiles$Compound_SMILES
 
 
-## write it into smiles format
-for (i in 1:length(compound_smiles)) {
-    if (i == 1) {
-        cat(compound_smiles[i], '\n', 
-            file = paste(path, 'test/compoundSmiles.smiles', sep = ''), 
-            append = FALSE)
-    } else {
-        cat(compound_smiles[i], '\n', 
-            file = paste(path, 'test/compoundSmiles.smiles', sep = ''), 
-            append = TRUE)
-    }
-}
+## write final set of smiles to file
+allSmilesFilename <- paste(path, 'test/compoundSmiles.smi', sep = '')
+write_lines(compound_smiles, allSmilesFilename)
 
 
-## extract features
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## MANUAL STEP TO BE DONE BY HAND!
+
+## Generate compound features!    [TRAINING DATA]
+
+## Compound features are obtained via the python package: Mordred. It is 
+## available from the following link:
+##      https://github.com/mordred-descriptor/mordred
+## 
+## The command used to generate the features was:
+##      python -m mordred compoundSmiles.smi -o compoundFeaturesMordred.csv
+## 
+## To generate the features, the mordred package needed to be installed first, 
+## which was done as follows:
+##      Install Rdkit: conda install -c conda-forge rdkit
+##      Install MORDRED: conda install -c rdkit -c mordred-descriptor mordred
+##          if doesn't work: pip install mordred
+## 
+
+
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## Compound features post-processing!    [TEST DATA]
+
+
+## clear environment
+rm(list = setdiff(ls(), 'path'))
+
+
+## load data
+colTypesSpecs <- paste('c', paste(rep('d',1426), collapse=''), sep='')
+compound_features_train <- 
+    read_csv(paste(path, 'train/compoundFeatures.csv', sep = ''), 
+             col_types = colTypesSpecs)
+colTypesSpecs <- paste('c', paste(rep('d',1613), collapse=''), sep='')
 compound_features_test <- 
-    extractDrugAIO(molecules = readMolFromSmi(paste(path, 'test/compoundSmiles.smiles', sep = ''), 'mol'), 
-                   warn = FALSE)
+    read_csv(paste(path, 'test/compoundFeaturesMordred.csv', sep = ''), 
+             col_types = colTypesSpecs) %>% 
+    rename(compound_smiles = name)
+
+
+## remove two variables: 'Lipinski', 'GhoseFilter'
+compound_features_test <- 
+    compound_features_test %>% 
+    select(-Lipinski, -GhoseFilter)
 
 
 ## keep only features that appear in the training set as well
-compound_features_train <- read_csv(paste(path, 'train/compoundFeatures.csv', sep = ''))
-compound_features_test <- compound_features_test[,colnames(compound_features_train)[2:166]]
+numFeatures <- ncol(compound_features_train)
+compound_features_test <- 
+    compound_features_test %>% 
+    select(-compound_smiles)
+compound_features_test <- 
+    compound_features_test[,colnames(compound_features_train)[2:numFeatures]]
 fwrite(compound_features_test, 
        paste(path, 'test/compoundFeatures.csv', sep = ''), 
        quote = FALSE, 
@@ -459,22 +566,24 @@ fwrite(compound_features_test,
 ## NOTE: compound features are saved WITHOUT their compound IDs
 
 
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
+
+
+## Get Targets IDs!    [TEST DATA]
+
+
+## clear environment
+rm(list = setdiff(ls(), 'path'))
+
+
 # get test target features
 target_uniprot <- read_csv('data/round_1_template.csv')
-target_uniprot <- target_uniprot$UniProt_Id
-
-# fwrite(target_uniprot, 
-#        paste(path, 'test/targetUniprotIDs.txt', sep = ''), 
-#        row.names = FALSE, 
-#        col.names = FALSE, 
-#        quote = FALSE)
-
-## --------------------------------
-## print target IDs on console
-# for (target_ID in target_uniprot) {
-#     cat(target_ID, '\n')
-# }
-## --------------------------------
+target_uniprot <- target_uniprot$UniProt_Id %>% unique
+write_lines(target_uniprot, 
+            path = paste(path, 'test/targetIDs.txt', sep = ''))
 
 
 ##-----------------------------------------------------------------------
@@ -495,13 +604,40 @@ target_uniprot <- target_uniprot$UniProt_Id
 ##-----------------------------------------------------------------------
 
 
-## get sequences and merge them with their corresponding UniProt IDs
-target_sequences <- read.fasta(paste(path, 'test/targets.fasta', sep = ''), seqtype = 'AA')
-sequences <- getSequence(target_sequences, as.string = TRUE)
-sequences <- paste(target_uniprot, as.vector(unlist(sequences)), sep = ',')
+## get target sequences file!    [TEST DATA]
 
 
-## write fasta file containing UniProt IDs and their sequences
+## clear environment
+rm(list = setdiff(ls(), 'path'))
+
+
+## stuff we'll need below
+target_IDs <- read_lines(paste(path, 'test/targetIDs.txt', sep = ''))
+
+
+## parse sequences and their Uniprot IDs
+target_sequences <- read.fasta(paste(path, 'test/targets.fasta', sep = ''), 
+                               seqtype = 'AA')
+sequences <- 
+    getSequence(target_sequences, as.string = TRUE) %>% 
+    unlist %>% 
+    as.vector
+getTargetId <- function(x) {
+    x <- strsplit(x, '|', fixed = TRUE)[[1]][2]
+    return(x)
+}
+seqHeaders <- 
+    getName(target_sequences) %>% 
+    sapply(getTargetId) %>% 
+    as.vector
+
+## consistency check
+sequences <- sequences[seqHeaders %in% target_IDs]
+seqHeaders <- seqHeaders[seqHeaders %in% target_IDs]
+sequences <- paste(seqHeaders, sequences, sep = ',')
+
+
+## simplify protein IDs in FASTA file before submitting to PROFEAT
 write_sequence <- function(sequence, file_name) {
   sink(file_name, append = TRUE)
   splitParts <- strsplit(sequence, ',')
@@ -511,7 +647,14 @@ write_sequence <- function(sequence, file_name) {
   # cat('\n')
   sink()
 }
-walk(sequences, ~write_sequence(.x, paste(path, 'test/targets_modifiedIDs.fasta', sep = '')))
+walk(sequences, 
+     ~write_sequence(.x, 
+                     paste(path, 'test/targets_modifiedIDs.fasta', sep = '')))
+
+
+## save protein Uniprot IDs along with their sequences
+write_lines(sequences, 
+            paste(path, 'test/targets_IDs_sequences.csv', sep = ''))
 
 
 ##-----------------------------------------------------------------------
@@ -520,35 +663,50 @@ walk(sequences, ~write_sequence(.x, paste(path, 'test/targets_modifiedIDs.fasta'
 ##-----------------------------------------------------------------------
 
 
-## MANUAL STEP
-## PROFEAT: get features using FASTA file
-## Input:   paste(path, 'test/targets_modifiedIDs.fasta', sep = '')
-## Output:  paste(path, 'test/targetFeatures.out', sep = '')
+## Get target features!    [TEST DATA]
 
 
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
-##-----------------------------------------------------------------------
+## clear environment
+rm(list = setdiff(ls(), 'path'))
 
 
-#  Load 'testTargetFeatures.txt' and fix target IDs
-#          take string after 1st '|' separator 
-target_features_test <- read_csv(paste(path, 'test/targetFeatures.out', sep = ''))
-target_features_test <- rename(target_features_test, target_id = Feature)
-## ---------------------
-## Check equivalance of target IDs?
-# all(target_uniprot == target_features_test$target_id)
-## ---------------------
-target_features_test <- target_features_test %>% select(-target_id)
+## read the data
+seq_data <- read_csv(paste(path, 'test/targets_IDs_sequences.csv', sep = ''),
+                      col_names = F)
+sequences <- seq_data[,2] %>% unlist %>% as.vector
+target_IDs <- seq_data[,1] %>% unlist %>% as.vector
 
 
-## keep only features that appear in the training set as well
-target_features_train <- read_csv(paste(path, 'train/targetFeatures.csv', sep = ''))
-target_features_test <- target_features_test[,colnames(target_features_train)[2:1432]]
-fwrite(target_features_test, 
-       paste(path, 'test/targetFeatures.csv', sep = ''), 
-       quote = FALSE, 
+## generate features (this step takes less than an hour for 1260 proteins)
+first_time <- T
+for (s in sequences) {
+    ## get features of current sequence
+    sFeatures <- 
+        extractProtAAC(s) %>% 
+        append(extractProtDC(s)) %>% 
+        append(extractProtGeary(s)) %>% 
+        append(extractProtCTDC(s)) %>% 
+        append(extractProtCTDT(s)) %>% 
+        append(extractProtCTDD(s)) %>% 
+        append(extractProtQSO(s)) %>% 
+        append(extractProtAPAAC(s)) %>% 
+        append(extractProtSOCN(s)) %>% 
+        append(extractProtCTriad(s))
+    
+    if (first_time) {
+        target_features <- sFeatures
+        first_time <- F
+    } else {
+        target_features <- rbind(target_features, sFeatures)
+    }
+}
+
+
+## write to file
+target_features <- as_data_frame(target_features)
+fwrite(target_features,    # cbind(target_IDs, target_features),
+       paste(path, 'test/targetFeatures.csv', sep = ''),
+       quote = FALSE,
        row.names = FALSE)
 ## NOTE: target features are saved WITHOUT their target IDs
 
@@ -588,9 +746,11 @@ rm(list = setdiff(ls(), 'path'))
 
 ## generate training set for training prediction models
 dtc <- read_csv(paste(path, 'train/DTC_data_final.csv', sep = ''))
-compound_features <- read_csv(paste(path, 'train/compoundFeaturesNormalized.csv', sep = ''))
-compound_features <- rename(compound_features,  compound_id = compound_IDs)
-target_features <- read_csv(paste(path, 'train/targetFeaturesNormalized.csv', sep = ''))
+compound_features <- 
+    read_csv(paste(path, 'train/compoundFeaturesNormalized.csv', sep = ''))
+target_features <- 
+    read_csv(paste(path, 'train/targetFeaturesNormalized.csv', sep = ''),
+             na = character())
 target_features <- rename(target_features, target_id = target_IDs)
 full_dataset <- 
     dtc %>% 
@@ -613,9 +773,19 @@ rm(list = setdiff(ls(), 'path'))
 
 
 ## generate test set
-compound_features <- read_csv(paste(path, 'test/compoundFeaturesNormalized.csv', sep = ''))
-target_features <- read_csv(paste(path, 'test/targetFeaturesNormalized.csv', sep = ''))
-full_dataset <- cbind(compound_features %>% select(-compound_IDs),
+compound_features <- 
+    read_csv(paste(path, 'test/compoundFeaturesNormalized.csv', sep = ''))
+target_features <- 
+    read_csv(paste(path, 'test/targetFeaturesNormalized.csv', sep = ''),
+             na = character())
+target_features$target_IDs <- 
+    read_lines(paste(path, 'test/targetIDs.txt', sep = ''))
+target_IDs <- 
+    read_csv('data/round_1_template.csv') %>% 
+    select(UniProt_Id) %>% 
+    rename(target_IDs = UniProt_Id)
+target_features <- inner_join(target_IDs,target_features, by = 'target_IDs')
+full_dataset <- cbind(compound_features %>% select(-compound_id),
                       target_features %>% select(-target_IDs))
 fwrite(full_dataset, paste(path, 'test/test.csv', sep = ''))
 
