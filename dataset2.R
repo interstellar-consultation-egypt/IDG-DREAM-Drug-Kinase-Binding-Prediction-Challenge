@@ -756,6 +756,9 @@ full_dataset <-
     dtc %>% 
     inner_join(compound_features, by = 'compound_id') %>% 
     inner_join(target_features, by = 'target_id')
+full_dataset <- 
+    full_dataset %>% 
+    select(-standard_inchi_key)
 fwrite(full_dataset, paste(path, 'train/train.csv', sep = ''))
 
 
